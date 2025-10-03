@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import SessionCard from "@/components/SessionCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { History as HistoryIcon } from "lucide-react";
+import { formatHoursDetailed } from "@/utils/timeUtils";
 
 const History = () => {
   const [user, setUser] = useState<any>(null);
@@ -92,7 +93,7 @@ const History = () => {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-primary">
-                {totalHours.toFixed(2)} hours
+                {formatHoursDetailed(totalHours)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 Across {sessions.length} sessions

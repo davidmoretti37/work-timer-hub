@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Clock } from "lucide-react";
 import StatusBadge from "./StatusBadge";
+import { formatHoursToReadable } from "@/utils/timeUtils";
 
 interface SessionCardProps {
   clockIn: string;
@@ -47,7 +48,7 @@ const SessionCard = ({ clockIn, clockOut, hoursWorked, userName }: SessionCardPr
         <div>
           <div className="text-xs text-muted-foreground mb-1">Hours</div>
           <div className="text-sm font-semibold text-primary">
-            {hoursWorked ? `${hoursWorked.toFixed(2)}h` : "—"}
+            {hoursWorked ? formatHoursToReadable(hoursWorked) : "—"}
           </div>
         </div>
       </div>
