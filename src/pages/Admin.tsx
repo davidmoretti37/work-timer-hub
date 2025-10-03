@@ -77,6 +77,8 @@ const Admin = () => {
       if (profilesData) {
         const profileMap = new Map(profilesData.map(p => [p.id, p]));
         setProfiles(profileMap);
+        console.log("Profiles loaded:", profileMap);
+        console.log("Sessions:", sessionsData);
       }
     }
   };

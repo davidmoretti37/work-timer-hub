@@ -25,11 +25,9 @@ const SessionCard = ({ clockIn, clockOut, hoursWorked, userName }: SessionCardPr
         <StatusBadge isClockedIn={isActive} />
       </div>
 
-      {userName && (
-        <div className="mb-3 text-sm text-muted-foreground">
-          User: <span className="font-medium text-foreground">{userName}</span>
-        </div>
-      )}
+      <div className="mb-3 text-sm text-muted-foreground">
+        User: <span className="font-medium text-foreground">{userName || "Unknown User"}</span>
+      </div>
 
       <div className="grid grid-cols-3 gap-4">
         <div>
