@@ -11,7 +11,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Users, CalendarIcon } from "lucide-react";
 import { formatHoursDetailed } from "@/utils/timeUtils";
-import { format, subWeeks, subMonths, startOfDay, endOfDay, isWithinInterval } from "date-fns";
+import { format, subWeeks, subMonths, startOfDay, endOfDay, isWithinInterval, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 const Admin = () => {
   const [user, setUser] = useState<any>(null);
@@ -21,6 +22,7 @@ const Admin = () => {
   const [profileCreationAttempted, setProfileCreationAttempted] = useState<Set<string>>(new Set());
   const [userFilters, setUserFilters] = useState<Map<string, { period: string; customStart?: Date; customEnd?: Date }>>(new Map());
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -200,6 +202,62 @@ const Admin = () => {
     return { sessions: filteredSessions.length, hours: totalHours, filteredSessions };
   };
 
+  const groupSessionsByDay = (sessions: any[], filter: { period: string; customStart?: Date; customEnd?: Date } | undefined) => {
+    if (!filter || filter.period === 'all') {
+      return { grouped: false, sessions };
+    }
+
+    // Get the date range for the filter
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date = endOfDay(now);
+
+    switch (filter.period) {
+      case 'week':
+        startDate = startOfDay(subWeeks(now, 1));
+        endDate = endOfDay(now);
+        break;
+      case 'biweekly':
+        startDate = startOfDay(subWeeks(now, 2));
+        endDate = endOfDay(now);
+        break;
+      case 'month':
+        startDate = startOfDay(subMonths(now, 1));
+        endDate = endOfDay(now);
+        break;
+      case 'custom':
+        if (filter.customStart && filter.customEnd) {
+          startDate = startOfDay(filter.customStart);
+          endDate = endOfDay(filter.customEnd);
+        } else {
+          return { grouped: false, sessions };
+        }
+        break;
+      default:
+        return { grouped: false, sessions };
+    }
+
+    // Get all days in the range
+    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+    
+    // Group sessions by day
+    const sessionsByDay = allDays.map(day => {
+      const daySessions = sessions.filter(session => 
+        isSameDay(new Date(session.clock_in), day)
+      );
+      const dayHours = daySessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0);
+      
+      return {
+        date: day,
+        sessions: daySessions,
+        hours: dayHours,
+        hasData: daySessions.length > 0
+      };
+    });
+
+    return { grouped: true, sessionsByDay };
+  };
+
   const handleFilterChange = (userId: string, period: string) => {
     const newFilters = new Map(userFilters);
     newFilters.set(userId, { period });
@@ -221,6 +279,59 @@ const Admin = () => {
     currentFilter.period = 'custom';
     newFilters.set(userId, currentFilter);
     setUserFilters(newFilters);
+  };
+
+  const handleUpdateSession = async (sessionId: string, clockIn: string, clockOut: string | null) => {
+    try {
+      const { error } = await supabase
+        .from("time_sessions")
+        .update({
+          clock_in: clockIn,
+          clock_out: clockOut,
+        })
+        .eq("id", sessionId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Session updated",
+        description: "Session times have been updated and hours recalculated.",
+      });
+
+      // Refresh sessions to get updated hours_worked
+      await fetchAllSessions();
+    } catch (error: any) {
+      toast({
+        title: "Error updating session",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    try {
+      const { error } = await supabase
+        .from("time_sessions")
+        .delete()
+        .eq("id", sessionId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Session deleted",
+        description: "The session has been removed.",
+      });
+
+      // Refresh sessions
+      await fetchAllSessions();
+    } catch (error: any) {
+      toast({
+        title: "Error deleting session",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   if (!user || !isAdmin) {
@@ -288,6 +399,10 @@ const Admin = () => {
                   clockOut={session.clock_out}
                   hoursWorked={session.hours_worked}
                   userName={profiles.get(session.user_id)?.full_name}
+                  sessionId={session.id}
+                  isAdmin={true}
+                  onUpdate={handleUpdateSession}
+                  onDelete={handleDeleteSession}
                 />
               ))}
             </TabsContent>
@@ -380,21 +495,71 @@ const Admin = () => {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {stats.filteredSessions.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No sessions found for the selected period
-                        </div>
-                      ) : (
-                        stats.filteredSessions.map((session) => (
-                          <SessionCard
-                            key={session.id}
-                            clockIn={session.clock_in}
-                            clockOut={session.clock_out}
-                            hoursWorked={session.hours_worked}
-                            userName={profiles.get(session.user_id)?.full_name}
-                          />
-                        ))
-                      )}
+                      {(() => {
+                        const currentFilter = userFilters.get(userId);
+                        const groupedData = groupSessionsByDay(stats.filteredSessions, currentFilter);
+                        
+                        if (stats.filteredSessions.length === 0) {
+                          return (
+                            <div className="text-center py-8 text-muted-foreground">
+                              No sessions found for the selected period
+                            </div>
+                          );
+                        }
+                        
+                        if (!groupedData.grouped) {
+                          // Show regular session list for "All Time"
+                          return stats.filteredSessions.map((session) => (
+                            <SessionCard
+                              key={session.id}
+                              clockIn={session.clock_in}
+                              clockOut={session.clock_out}
+                              hoursWorked={session.hours_worked}
+                              userName={profiles.get(session.user_id)?.full_name}
+                              sessionId={session.id}
+                              isAdmin={true}
+                              onUpdate={handleUpdateSession}
+                              onDelete={handleDeleteSession}
+                            />
+                          ));
+                        }
+                        
+                        // Show day-by-day breakdown for filtered periods
+                        return groupedData.sessionsByDay.map((dayData) => (
+                          <div key={dayData.date.toISOString()} className="border rounded-lg p-4 bg-muted/20">
+                            <div className="flex justify-between items-center mb-3">
+                              <h4 className="font-semibold text-lg">
+                                {format(dayData.date, "EEEE, MMM d, yyyy")}
+                              </h4>
+                              <div className="text-sm font-medium text-primary">
+                                {dayData.hasData ? formatHoursDetailed(dayData.hours) : "No sessions"}
+                              </div>
+                            </div>
+                            
+                            {dayData.hasData ? (
+                              <div className="space-y-3">
+                                {dayData.sessions.map((session) => (
+                                  <SessionCard
+                                    key={session.id}
+                                    clockIn={session.clock_in}
+                                    clockOut={session.clock_out}
+                                    hoursWorked={session.hours_worked}
+                                    userName={profiles.get(session.user_id)?.full_name}
+                                    sessionId={session.id}
+                                    isAdmin={true}
+                                    onUpdate={handleUpdateSession}
+                                    onDelete={handleDeleteSession}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 text-muted-foreground text-sm">
+                                No work sessions on this day
+                              </div>
+                            )}
+                          </div>
+                        ));
+                      })()}
                     </CardContent>
                   </Card>
                 );
