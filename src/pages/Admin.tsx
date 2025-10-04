@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Users, CalendarIcon } from "lucide-react";
+import { Users, CalendarIcon, Download, FileSpreadsheet } from "lucide-react";
 import { formatHoursDetailed } from "@/utils/timeUtils";
 import { format, subWeeks, subMonths, startOfDay, endOfDay, isWithinInterval, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 
 const Admin = () => {
   const [user, setUser] = useState<any>(null);
@@ -334,6 +335,260 @@ const Admin = () => {
     }
   };
 
+  const exportUserData = (userId: string, filter: { period: string; customStart?: Date; customEnd?: Date } | undefined) => {
+    const profile = profiles.get(userId);
+    const userName = profile?.admin_display_name || profile?.full_name || 'Unknown User';
+    
+    try {
+      // Get filtered sessions for this user
+      const userSessions = getFilteredSessions(userId);
+      
+      if (userSessions.length === 0) {
+        toast({
+          title: "No data to export",
+          description: `No sessions found for ${userName} in the selected period.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get period label
+      let periodLabel = 'All Time';
+      if (filter) {
+        switch (filter.period) {
+          case 'week':
+            periodLabel = 'Last Week';
+            break;
+          case 'biweekly':
+            periodLabel = 'Last 2 Weeks';
+            break;
+          case 'month':
+            periodLabel = 'Last Month';
+            break;
+          case 'custom':
+            if (filter.customStart && filter.customEnd) {
+              periodLabel = `${format(filter.customStart, 'MMM d')} - ${format(filter.customEnd, 'MMM d, yyyy')}`;
+            }
+            break;
+        }
+      }
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+
+      // User Summary Sheet
+      const summaryData = [];
+      summaryData.push([`${userName} - Timesheet Report`]);
+      summaryData.push(['Period:', periodLabel]);
+      summaryData.push(['Export Date:', format(new Date(), 'MMM d, yyyy h:mm a')]);
+      summaryData.push(['']); // Empty row
+
+      const totalHours = userSessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0);
+      summaryData.push(['Summary']);
+      summaryData.push(['Total Sessions:', userSessions.length]);
+      summaryData.push(['Total Hours:', totalHours.toFixed(2)]);
+      summaryData.push(['']); // Empty row
+
+      // Sessions detail
+      summaryData.push(['Session Details']);
+      summaryData.push(['Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Status']);
+
+      userSessions.forEach(session => {
+        const date = format(new Date(session.clock_in), 'MMM d, yyyy');
+        const clockIn = format(new Date(session.clock_in), 'h:mm a');
+        const clockOut = session.clock_out ? format(new Date(session.clock_out), 'h:mm a') : 'Active';
+        const hours = session.hours_worked ? session.hours_worked.toFixed(2) : '0.00';
+        const status = session.clock_out ? 'Completed' : 'In Progress';
+
+        summaryData.push([date, clockIn, clockOut, hours, status]);
+      });
+
+      // Create worksheet
+      const ws = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, ws, 'Timesheet');
+
+      // Generate filename
+      const filename = `${userName.replace(/\s+/g, '_')}_${periodLabel.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+
+      // Write and download file
+      XLSX.writeFile(workbook, filename);
+
+      toast({
+        title: "Export successful",
+        description: `${userName}'s timesheet exported as ${filename}`,
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportToExcel = (period: string, customStart?: Date, customEnd?: Date) => {
+    try {
+      // Get date range
+      const now = new Date();
+      let startDate: Date;
+      let endDate: Date = endOfDay(now);
+      let periodLabel = '';
+
+      switch (period) {
+        case 'week':
+          startDate = startOfDay(subWeeks(now, 1));
+          periodLabel = 'Last Week';
+          break;
+        case 'biweekly':
+          startDate = startOfDay(subWeeks(now, 2));
+          periodLabel = 'Last 2 Weeks';
+          break;
+        case 'month':
+          startDate = startOfDay(subMonths(now, 1));
+          periodLabel = 'Last Month';
+          break;
+        case 'custom':
+          if (customStart && customEnd) {
+            startDate = startOfDay(customStart);
+            endDate = endOfDay(customEnd);
+            periodLabel = `${format(customStart, 'MMM d')} - ${format(customEnd, 'MMM d, yyyy')}`;
+          } else {
+            startDate = startOfDay(subWeeks(now, 1));
+            periodLabel = 'Custom Range';
+          }
+          break;
+        default:
+          startDate = startOfDay(subWeeks(now, 1));
+          periodLabel = 'All Time';
+      }
+
+      // Filter sessions by date range
+      const filteredSessions = sessions.filter(session => {
+        const sessionDate = new Date(session.clock_in);
+        return isWithinInterval(sessionDate, { start: startDate, end: endDate });
+      });
+
+      if (filteredSessions.length === 0) {
+        toast({
+          title: "No data to export",
+          description: "No sessions found for the selected period.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+
+      // Summary Sheet
+      const summaryData = [];
+      summaryData.push(['TimeTracker Export Report']);
+      summaryData.push(['Period:', periodLabel]);
+      summaryData.push(['Export Date:', format(new Date(), 'MMM d, yyyy h:mm a')]);
+      summaryData.push(['']); // Empty row
+
+      // User summaries
+      summaryData.push(['User Summary']);
+      summaryData.push(['User Name', 'Total Sessions', 'Total Hours']);
+      
+      const uniqueUserIds = [...new Set(filteredSessions.map(s => s.user_id))];
+      let grandTotalHours = 0;
+      
+      uniqueUserIds.forEach(userId => {
+        const userSessions = filteredSessions.filter(s => s.user_id === userId);
+        const totalHours = userSessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0);
+        const profile = profiles.get(userId);
+        const userName = profile?.admin_display_name || profile?.full_name || 'Unknown User';
+        
+        summaryData.push([userName, userSessions.length, totalHours.toFixed(2)]);
+        grandTotalHours += totalHours;
+      });
+      
+      summaryData.push(['']); // Empty row
+      summaryData.push(['TOTAL', filteredSessions.length, grandTotalHours.toFixed(2)]);
+
+      // Create summary worksheet
+      const summaryWS = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(workbook, summaryWS, 'Summary');
+
+      // Detailed Sessions Sheet
+      const detailedData = [];
+      detailedData.push(['Detailed Time Sessions']);
+      detailedData.push(['User Name', 'Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Status']);
+
+      filteredSessions.forEach(session => {
+        const profile = profiles.get(session.user_id);
+        const userName = profile?.admin_display_name || profile?.full_name || 'Unknown User';
+        const date = format(new Date(session.clock_in), 'MMM d, yyyy');
+        const clockIn = format(new Date(session.clock_in), 'h:mm a');
+        const clockOut = session.clock_out ? format(new Date(session.clock_out), 'h:mm a') : 'Active';
+        const hours = session.hours_worked ? session.hours_worked.toFixed(2) : '0.00';
+        const status = session.clock_out ? 'Completed' : 'In Progress';
+
+        detailedData.push([userName, date, clockIn, clockOut, hours, status]);
+      });
+
+      // Create detailed worksheet
+      const detailedWS = XLSX.utils.aoa_to_sheet(detailedData);
+      XLSX.utils.book_append_sheet(workbook, detailedWS, 'Detailed Sessions');
+
+      // Daily Breakdown Sheet (if period is not 'all')
+      if (period !== 'all') {
+        const dailyData = [];
+        dailyData.push(['Daily Breakdown']);
+        dailyData.push(['Date', 'User Name', 'Total Hours', 'Sessions']);
+
+        const allDays = eachDayOfInterval({ start: startDate, end: endDate });
+        
+        allDays.forEach(day => {
+          const daySessions = filteredSessions.filter(session => 
+            isSameDay(new Date(session.clock_in), day)
+          );
+          
+          if (daySessions.length > 0) {
+            const dayLabel = format(day, 'EEEE, MMM d, yyyy');
+            
+            // Group by user for this day
+            const userSessionsByDay = uniqueUserIds.filter(userId => 
+              daySessions.some(s => s.user_id === userId)
+            );
+            
+            userSessionsByDay.forEach(userId => {
+              const userDaySessions = daySessions.filter(s => s.user_id === userId);
+              const dayHours = userDaySessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0);
+              const profile = profiles.get(userId);
+              const userName = profile?.admin_display_name || profile?.full_name || 'Unknown User';
+              
+              dailyData.push([dayLabel, userName, dayHours.toFixed(2), userDaySessions.length]);
+            });
+          }
+        });
+
+        const dailyWS = XLSX.utils.aoa_to_sheet(dailyData);
+        XLSX.utils.book_append_sheet(workbook, dailyWS, 'Daily Breakdown');
+      }
+
+      // Generate filename
+      const filename = `TimeTracker_${periodLabel.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+
+      // Write and download file
+      XLSX.writeFile(workbook, filename);
+
+      toast({
+        title: "Export successful",
+        description: `Timesheet exported as ${filename}`,
+      });
+
+    } catch (error: any) {
+      toast({
+        title: "Export failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (!user || !isAdmin) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -438,21 +693,33 @@ const Admin = () => {
                         </div>
                         
                         <div className="flex flex-col gap-2">
-                          <Select
-                            value={currentFilter?.period || 'all'}
-                            onValueChange={(value) => handleFilterChange(userId, value)}
-                          >
-                            <SelectTrigger className="w-[140px]">
-                              <SelectValue placeholder="Filter period" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Time</SelectItem>
-                              <SelectItem value="week">Last Week</SelectItem>
-                              <SelectItem value="biweekly">Last 2 Weeks</SelectItem>
-                              <SelectItem value="month">Last Month</SelectItem>
-                              <SelectItem value="custom">Custom Range</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex gap-2">
+                            <Select
+                              value={currentFilter?.period || 'all'}
+                              onValueChange={(value) => handleFilterChange(userId, value)}
+                            >
+                              <SelectTrigger className="w-[140px]">
+                                <SelectValue placeholder="Filter period" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Time</SelectItem>
+                                <SelectItem value="week">Last Week</SelectItem>
+                                <SelectItem value="biweekly">Last 2 Weeks</SelectItem>
+                                <SelectItem value="month">Last Month</SelectItem>
+                                <SelectItem value="custom">Custom Range</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            
+                            <Button
+                              variant="default"
+                              size="sm" 
+                              onClick={() => exportUserData(userId, currentFilter)}
+                              className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              <Download className="h-3 w-3" />
+                              Export Excel
+                            </Button>
+                          </div>
                           
                           {currentFilter?.period === 'custom' && (
                             <div className="flex gap-2">
