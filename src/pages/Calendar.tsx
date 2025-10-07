@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import Navbar from "@/components/Navbar";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths } from "date-fns";
@@ -13,6 +17,12 @@ const Calendar = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [ptoRequests, setPtoRequests] = useState<any[]>([]);
+  const [isDayOpen, setIsDayOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [events, setEvents] = useState<any[]>([]);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventNotes, setNewEventNotes] = useState("");
+  const [savingEvent, setSavingEvent] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -106,10 +116,7 @@ const Calendar = () => {
       
       let query = supabase
         .from("pto_requests")
-        .select(`
-          *,
-          profiles:user_id(display_name, email)
-        `)
+        .select("*")
         .eq("status", "approved");
 
       // If not admin, only fetch current user's PTO
@@ -139,6 +146,92 @@ const Calendar = () => {
       const endDate = new Date(pto.end_date);
       return date >= startDate && date <= endDate;
     });
+  };
+
+  const openDay = async (date: Date) => {
+    setSelectedDate(date);
+    setIsDayOpen(true);
+    await fetchEventsForDate(date);
+  };
+
+  const fetchEventsForDate = async (date: Date) => {
+    try {
+      const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString().slice(0,10);
+      let query = supabase
+        .from("calendar_events")
+        .select("*")
+        .eq("event_date", iso);
+
+      if (!isAdmin && user) {
+        query = query.eq("user_id", user.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setEvents(data || []);
+    } catch (e) {
+      console.error("Error fetching events:", e);
+    }
+  };
+
+  const saveEvent = async () => {
+    if (!user || !selectedDate || !newEventTitle.trim()) return;
+    setSavingEvent(true);
+    try {
+      const iso = new Date(Date.UTC(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())).toISOString().slice(0,10);
+      const { error } = await supabase
+        .from("calendar_events")
+        .insert({
+          user_id: user.id,
+          event_date: iso,
+          title: newEventTitle.trim(),
+          notes: newEventNotes.trim() || null,
+        });
+      if (error) throw error;
+      setNewEventTitle("");
+      setNewEventNotes("");
+      await fetchEventsForDate(selectedDate);
+    } catch (e:any) {
+      console.error("Failed to save event:", e);
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  const downloadPtoPdf = async (pto: any) => {
+    const mod = await import("jspdf");
+    const doc = new mod.jsPDF();
+    doc.setFontSize(16);
+    doc.text("PTO Request", 14, 20);
+    doc.setFontSize(12);
+    const y = 30;
+    const lines = [
+      `Employee: ${pto.employee_name}`,
+      `Request Type: ${pto.request_type}`,
+      `Start: ${new Date(pto.start_date).toLocaleDateString()}`,
+      `End: ${new Date(pto.end_date).toLocaleDateString()}`,
+      `Reason: ${pto.reason_type}`,
+      pto.custom_reason ? `Details: ${pto.custom_reason}` : "",
+      `Submitted: ${new Date(pto.submission_date).toLocaleString()}`,
+      pto.employer_name ? `Approved By: ${pto.employer_name}` : "",
+    ].filter(Boolean);
+    let cursor = y;
+    lines.forEach((line) => { doc.text(line, 14, cursor); cursor += 8; });
+    try {
+      if (pto.employee_signature) {
+        doc.text("Employee Signature:", 14, cursor);
+        cursor += 6;
+        doc.addImage(pto.employee_signature, "PNG", 14, cursor, 60, 20);
+        cursor += 26;
+      }
+      if (pto.employer_signature) {
+        doc.text("Employer Signature:", 14, cursor);
+        cursor += 6;
+        doc.addImage(pto.employer_signature, "PNG", 14, cursor, 60, 20);
+        cursor += 26;
+      }
+    } catch (_) {}
+    doc.save(`${(pto.employee_name || 'employee').replace(/\s+/g,'_')}_PTO_${new Date(pto.start_date).toISOString().slice(0,10)}.pdf`);
   };
 
   // Calendar logic
@@ -224,6 +317,7 @@ const Calendar = () => {
                       ${isCurrentMonth ? "bg-card" : "bg-muted/30"}
                       ${isCurrentDay ? "bg-primary/10 border-primary" : "border-border"}
                     `}
+                    onClick={() => openDay(date)}
                   >
                     <div className={`
                       text-sm font-medium mb-2
@@ -239,13 +333,10 @@ const Calendar = () => {
                         <div
                           key={pto.id + index}
                           className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded truncate border border-blue-200"
-                          title={`PTO - ${pto.profiles?.display_name || pto.employee_name} (${pto.reason_type})`}
+                          title={`PTO - ${pto.employee_name} (${pto.reason_type})`}
                         >
                           <div className="font-medium">
-                            {isAdmin 
-                              ? `${pto.profiles?.display_name || pto.employee_name} - PTO`
-                              : "PTO"
-                            }
+                            PTO
                           </div>
                           <div className="text-xs opacity-75 capitalize">
                             {pto.reason_type}
@@ -260,6 +351,58 @@ const Calendar = () => {
           </CardContent>
         </Card>
       </main>
+      {/* Day Modal */}
+      <Dialog open={isDayOpen} onOpenChange={setIsDayOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedDate ? format(selectedDate, "PPP") : "Selected Day"}
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* PTO list */}
+          <div className="space-y-2">
+            <h4 className="font-semibold">PTO Requests</h4>
+            {selectedDate && getPTOForDate(selectedDate).length === 0 && (
+              <div className="text-sm text-muted-foreground">No PTO for this date.</div>
+            )}
+            <div className="space-y-2">
+              {selectedDate && getPTOForDate(selectedDate).map((pto) => (
+                <div key={pto.id} className="flex items-center justify-between border rounded p-2 bg-card">
+                  <div className="text-sm">
+                    <div className="font-medium">{pto.employee_name}</div>
+                    <div className="opacity-75 capitalize">{pto.reason_type}</div>
+                  </div>
+                  <Button size="sm" onClick={() => downloadPtoPdf(pto)}>Download PDF</Button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Add Event */}
+          <div className="mt-4 space-y-2">
+            <h4 className="font-semibold">Add Event</h4>
+            <div className="grid grid-cols-1 gap-2">
+              <div>
+                <Label htmlFor="eventTitle">Title</Label>
+                <Input id="eventTitle" value={newEventTitle} onChange={(e)=>setNewEventTitle(e.target.value)} placeholder="Event title" />
+              </div>
+              <div>
+                <Label htmlFor="eventNotes">Notes</Label>
+                <Textarea id="eventNotes" value={newEventNotes} onChange={(e)=>setNewEventNotes(e.target.value)} placeholder="Optional notes" />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDayOpen(false)}>Close</Button>
+            <Button onClick={saveEvent} disabled={savingEvent || !newEventTitle.trim()}>
+              {savingEvent ? 'Saving...' : 'Save Event'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 };
