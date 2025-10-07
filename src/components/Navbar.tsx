@@ -14,16 +14,25 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
   const { toast } = useToast();
 
   const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to log out",
-        variant: "destructive",
+    // Prefer local sign-out to avoid 403s from global scope
+    try {
+      // @ts-expect-error - scope is supported at runtime
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (_) {}
+
+    // Fallback attempt (ignore errors like 403)
+    try { await supabase.auth.signOut(); } catch (_) {}
+
+    // Hard clear any cached auth tokens
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('sb-')) localStorage.removeItem(key);
       });
-    } else {
-      navigate("/auth");
-    }
+    } catch (_) {}
+
+    navigate("/auth", { replace: true });
+    // Ensure UI reflects logged-out state
+    window.location.reload();
   };
 
   return (

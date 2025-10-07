@@ -18,20 +18,46 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+    const verifyAndNavigate = async (userId: string) => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (data) {
         navigate("/dashboard");
+      } else {
+        // No profile row: force logout and show error prompting signup
+        try { // local scope preferred
+          // @ts-expect-error runtime supported
+          await supabase.auth.signOut({ scope: 'local' });
+        } catch (_) {}
+        try { await supabase.auth.signOut(); } catch (_) {}
+
+        toast({
+          title: "Account not found",
+          description: "This email is not registered in the system. Please create an account.",
+          variant: "destructive",
+        });
+        setIsLogin(false);
+      }
+    };
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user?.id) {
+        await verifyAndNavigate(session.user.id);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate("/dashboard");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user?.id) {
+        await verifyAndNavigate(session.user.id);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,11 +71,8 @@ const Auth = () => {
         });
 
         if (error) throw error;
-
-        toast({
-          title: "Welcome back!",
-          description: "You've successfully logged in.",
-        });
+        // After login, the auth listener above will verify profile and route or show error
+        toast({ title: "Welcome back!" });
       } else {
         const { error } = await supabase.auth.signUp({
           email,

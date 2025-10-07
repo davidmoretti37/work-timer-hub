@@ -64,12 +64,12 @@ serve(async (req) => {
           <p style="margin: 0 0 20px 0;">Click a button below to approve or reject this PTO request</p>
           
           <div style="margin-top: 20px;">
-            <a href="http://localhost:8080/approve-pto?id=${ptoData.id}&action=approve&token=${btoa(ptoData.id + ':approve')}" 
+            <a href="http://localhost:8080/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1" 
                style="display: inline-block; margin: 0 10px; padding: 12px 25px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
               ✅ APPROVE
             </a>
             
-            <a href="http://localhost:8080/approve-pto?id=${ptoData.id}&action=reject&token=${btoa(ptoData.id + ':reject')}" 
+            <a href="http://localhost:8080/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1" 
                style="display: inline-block; margin: 0 10px; padding: 12px 25px; background: #dc3545; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
               ❌ REJECT
             </a>
@@ -79,9 +79,9 @@ serve(async (req) => {
     `
 
     // Send the email using onboarding@resend.dev (works without domain verification)
-    const { data, error } = await resend.emails.send({
-      from: 'PTO System <onboarding@resend.dev>',
-      to: ['davidmoretti37@gmail.com'],
+        const { data, error } = await resend.emails.send({
+          from: 'PTO System <onboarding@resend.dev>',
+          to: ['davidmoretti37@gmail.com'],
       subject: `PTO Request - ${ptoData.employee_name}`,
       html: emailHtml,
     })

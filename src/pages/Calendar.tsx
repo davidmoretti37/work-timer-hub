@@ -94,8 +94,17 @@ const Calendar = () => {
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
     
+    if (!data) {
+      try { // logout if profile missing
+        // @ts-expect-error runtime supports scope
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (_) {}
+      try { await supabase.auth.signOut(); } catch (_) {}
+      navigate('/auth', { replace: true });
+      return;
+    }
     setProfile(data);
   };
 

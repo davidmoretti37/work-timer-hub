@@ -83,7 +83,7 @@ const PTO = () => {
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .single();
+      .maybeSingle();
     
     if (data) {
       setProfile(data);
@@ -92,6 +92,15 @@ const PTO = () => {
         employeeName: data.display_name || data.email || "",
         confirmationEmail: data.email || ""
       }));
+    } else {
+      // logout and redirect if no profile exists
+      try { // local scope preferred
+        // @ts-expect-error runtime supports scope
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (_) {}
+      try { await supabase.auth.signOut(); } catch (_) {}
+      navigate('/auth', { replace: true });
+      return;
     }
   };
 

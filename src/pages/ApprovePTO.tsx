@@ -24,16 +24,16 @@ const ApprovePTO = () => {
   const { toast } = useToast();
   const signaturePadRef = useRef<SignaturePadRef>(null);
 
-  const requestId = searchParams.get("id");
   const action = searchParams.get("action"); // 'approve' or 'reject'
   const token = searchParams.get("token");
+  const isPlain = (searchParams.get("plain") === "1" || searchParams.get("plain") === "true");
 
   useEffect(() => {
     const fetchPTORequest = async () => {
-      if (!requestId) {
+      if (!token) {
         toast({
           title: "Invalid Request",
-          description: "PTO request ID is missing",
+          description: "Approval token is missing",
           variant: "destructive",
         });
         navigate("/");
@@ -41,18 +41,11 @@ const ApprovePTO = () => {
       }
 
       try {
-        // Verify token (basic security)
-        const expectedToken = btoa(requestId + ':' + action);
-        if (token !== expectedToken) {
-          throw new Error("Invalid token");
-        }
-
-        // Fetch PTO request
+        // Fetch PTO request by token (for display only; update happens via Edge Function)
         const { data, error } = await supabase
           .from("pto_requests")
           .select("*")
-          .eq("id", requestId)
-          .eq("status", "pending")
+          .eq("approval_token", token)
           .single();
 
         if (error || !data) {
@@ -80,7 +73,7 @@ const ApprovePTO = () => {
   };
 
   const processApproval = async () => {
-    if (!ptoRequest) return;
+    if (!token) return;
 
     // Validate signature for approval
     if (action === "approve" && !ownerSignature) {
@@ -104,26 +97,18 @@ const ApprovePTO = () => {
     setSubmitting(true);
 
     try {
-      console.log("🔄 Updating PTO request:", requestId, "to status:", action === "approve" ? "approved" : "rejected");
-      
-      // Update PTO request status
-      const { data, error } = await supabase
-        .from("pto_requests")
-        .update({
-          status: action === "approve" ? "approved" : "rejected",
-          employer_decision_date: new Date().toISOString(),
-          employer_signature: ownerSignature || null,
-          employer_name: ownerName,
-          admin_notes: adminNotes || null,
-        })
-        .eq("id", requestId)
-        .select(); // Add select to return updated data
-
-      if (error) {
-        throw error;
-      }
-      
-      console.log("✅ PTO request updated successfully:", data);
+      console.log("🔄 Approving via Edge Function with token:", token);
+      const { data, error } = await supabase.functions.invoke('approve-pto', {
+        body: {
+          token,
+          action,
+          ownerName,
+          employerSignature: ownerSignature,
+          adminNotes,
+        },
+      });
+      if (error) throw error;
+      console.log("✅ Edge approval success:", data);
 
       // Send confirmation email to employee
       await sendConfirmationEmail();
@@ -206,9 +191,9 @@ const ApprovePTO = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
+      {!isPlain && <Navbar />}
       
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className={isPlain ? "mx-auto px-4 py-8 max-w-2xl" : "container mx-auto px-4 py-8 max-w-4xl"}>
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">

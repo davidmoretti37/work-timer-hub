@@ -58,12 +58,28 @@ const Dashboard = () => {
   }, [navigate]);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
-      .single();
-    
+      .maybeSingle();
+
+    if (!data) {
+      // No profile row: force logout and send user to auth with message
+      try { // prefer local scope
+        // @ts-expect-error runtime supports scope
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (_) {}
+      try { await supabase.auth.signOut(); } catch (_) {}
+      toast({
+        title: "Account not found",
+        description: "This email is not registered. Please create an account.",
+        variant: "destructive",
+      });
+      navigate('/auth', { replace: true });
+      return;
+    }
+
     setProfile(data);
   };
 
