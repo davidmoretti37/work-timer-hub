@@ -6,6 +6,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
+import Calendar from "./pages/Calendar";
+import PTO from "./pages/PTO";
+import ApprovePTO from "./pages/ApprovePTO";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -22,6 +25,9 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/history" element={<History />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/pto" element={<PTO />} />
+          <Route path="/approve-pto" element={<ApprovePTO />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

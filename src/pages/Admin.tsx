@@ -609,36 +609,6 @@ const Admin = () => {
             <p className="text-muted-foreground">Overview of all users and their work sessions</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Total Users</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-primary">{uniqueUserIds.length}</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Total Sessions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-primary">{sessions.length}</div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Total Hours</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-primary">
-                  {formatHoursDetailed(sessions.reduce((sum, s) => sum + (s.hours_worked || 0), 0))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           <Tabs defaultValue="all" className="w-full">
             <TabsList>
