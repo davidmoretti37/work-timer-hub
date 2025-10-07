@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm ci && npm run build"
+buildCommand = "npm install --include=dev --no-audit --no-fund && npm run build"
 
 [nixpacks]
 providers = ["node"]
@@ -14,3 +14,4 @@ restartPolicyMaxRetries = 10
 
 [variables]
 NIXPACKS_NODE_VERSION = "20"
+NPM_CONFIG_PRODUCTION = "false"
