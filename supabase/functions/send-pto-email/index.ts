@@ -81,7 +81,7 @@ serve(async (req) => {
     // Send the email using onboarding@resend.dev (works without domain verification)
         const { data, error } = await resend.emails.send({
           from: 'PTO System <onboarding@resend.dev>',
-          to: ['davidmoretti37@gmail.com'],
+          to: ['fbayma@baycoaviation.com'],
       subject: `PTO Request - ${ptoData.employee_name}`,
       html: emailHtml,
     })

@@ -225,7 +225,7 @@ const PTO = () => {
 
       toast({
         title: "PTO Request Submitted",
-        description: `Your request has been sent to davidmoretti37@gmail.com for approval. Confirmation will be sent to ${formData.confirmationEmail}`,
+        description: `Your request has been sent to fbayma@baycoaviation.com for approval. Confirmation will be sent to ${formData.confirmationEmail}`,
       });
 
       // Reset form
@@ -267,11 +267,11 @@ const PTO = () => {
         throw error;
       }
 
-      console.log('✅ Email sent successfully to davidmoretti37@gmail.com');
+      console.log('✅ Email sent successfully to fbayma@baycoaviation.com');
       
       toast({
         title: "Email Sent Automatically! ✅",
-        description: "PTO request sent to davidmoretti37@gmail.com - no manual action needed!",
+        description: "PTO request sent to fbayma@baycoaviation.com - no manual action needed!",
       });
 
     } catch (error: any) {
@@ -298,7 +298,7 @@ Please log into the admin panel to approve or reject this request.
       `.trim();
       
       // Open Gmail web interface to compose email
-      const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=davidmoretti37@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=fbayma@baycoaviation.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.open(gmailComposeUrl, '_blank');
       
       toast({
