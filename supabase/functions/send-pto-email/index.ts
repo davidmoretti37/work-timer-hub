@@ -1,15 +1,18 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// @ts-nocheck
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import nodemailer from "npm:nodemailer@6.9.7"
 
-const corsHeaders = {
+const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
+  'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-serve(async (req) => {
+serve(async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   try {
@@ -22,7 +25,7 @@ serve(async (req) => {
     }
 
     // Parse the request body
-    const { ptoData } = await req.json()
+    const { ptoData } = await req.json().catch(() => ({ ptoData: null as any }))
 
     // Validate required fields
     if (!ptoData) {
@@ -119,14 +122,19 @@ serve(async (req) => {
       },
     )
 
-  } catch (error) {
-    console.error('Function error:', error)
-    console.error('Error details:', JSON.stringify(error, null, 2))
+  } catch (error: unknown) {
+    const err = error as any
+    try {
+      console.error('Function error:', err?.message || err)
+      if (err) console.error('Error details:', JSON.stringify(err, null, 2))
+    } catch (_) {
+      // ignore JSON stringify issues
+    }
     
     return new Response(
       JSON.stringify({ 
-        error: error.message || 'Failed to send email',
-        details: String(error),
+        error: (err?.message as string) || 'Failed to send email',
+        details: String(err),
         success: false 
       }),
       {

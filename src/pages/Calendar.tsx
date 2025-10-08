@@ -243,6 +243,20 @@ const Calendar = () => {
     doc.save(`${(pto.employee_name || 'employee').replace(/\s+/g,'_')}_PTO_${new Date(pto.start_date).toISOString().slice(0,10)}.pdf`);
   };
 
+  const deletePto = async (ptoId: string) => {
+    try {
+      if (!confirm('Delete this PTO request? This cannot be undone.')) return;
+      const { error } = await supabase
+        .from('pto_requests')
+        .delete()
+        .eq('id', ptoId);
+      if (error) throw error;
+      await fetchPTORequests();
+    } catch (e:any) {
+      console.error('Failed to delete PTO:', e);
+    }
+  };
+
   // Calendar logic
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -382,7 +396,14 @@ const Calendar = () => {
                     <div className="font-medium">{pto.employee_name}</div>
                     <div className="opacity-75 capitalize">{pto.reason_type}</div>
                   </div>
-                  <Button size="sm" onClick={() => downloadPtoPdf(pto)}>Download PDF</Button>
+                  <div className="flex items-center gap-2">
+                    {isAdmin && (
+                      <Button variant="outline" size="sm" onClick={() => deletePto(pto.id)} className="border-destructive text-destructive">
+                        Delete
+                      </Button>
+                    )}
+                    <Button size="sm" onClick={() => downloadPtoPdf(pto)}>Download PDF</Button>
+                  </div>
                 </div>
               ))}
             </div>
