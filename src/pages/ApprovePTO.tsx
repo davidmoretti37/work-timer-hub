@@ -191,9 +191,9 @@ const ApprovePTO = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {!isPlain && <Navbar />}
+      {/* No Navbar - this page should work without login */}
       
-      <main className={isPlain ? "mx-auto px-4 py-8 max-w-2xl" : "container mx-auto px-4 py-8 max-w-4xl"}>
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
         <Card>
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">

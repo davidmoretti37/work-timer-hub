@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import Navbar from "@/components/Navbar";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths, subMonths } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 const Calendar = () => {
   const [user, setUser] = useState<any>(null);
@@ -24,6 +25,7 @@ const Calendar = () => {
   const [newEventNotes, setNewEventNotes] = useState("");
   const [savingEvent, setSavingEvent] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -251,9 +253,15 @@ const Calendar = () => {
         .delete()
         .eq('id', ptoId);
       if (error) throw error;
+      toast({ title: 'PTO deleted', description: 'The PTO request was removed.' });
       await fetchPTORequests();
     } catch (e:any) {
       console.error('Failed to delete PTO:', e);
+      toast({
+        title: 'Failed to delete PTO',
+        description: e?.message || 'An unknown error occurred while deleting.',
+        variant: 'destructive',
+      });
     }
   };
 
