@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { Resend } from 'npm:resend@2.0.0'
+import nodemailer from "npm:nodemailer@6.9.7"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,13 +13,13 @@ serve(async (req) => {
   }
 
   try {
-    // Get Resend API key from environment
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
-    if (!resendApiKey) {
-      throw new Error('RESEND_API_KEY is required')
+    // Get Outlook credentials from environment
+    const emailUser = Deno.env.get('OUTLOOK_EMAIL_USER')
+    const emailPassword = Deno.env.get('OUTLOOK_EMAIL_PASSWORD')
+    
+    if (!emailUser || !emailPassword) {
+      throw new Error('OUTLOOK_EMAIL_USER and OUTLOOK_EMAIL_PASSWORD are required')
     }
-
-    const resend = new Resend(resendApiKey)
 
     // Parse the request body
     const { ptoData } = await req.json()
@@ -89,25 +89,30 @@ serve(async (req) => {
       </div>
     `
 
-    // IMPORTANT: Resend free tier only allows sending to the account owner's email
-    // For testing, we always send to davidmoretti37@gmail.com
-    // To send to other emails, you need to verify a domain at resend.com/domains
-    const { data, error } = await resend.emails.send({
-      from: 'PTO System <onboarding@resend.dev>',
-      to: ['davidmoretti37@gmail.com'], // Must be account owner email for testing
+    // Configure nodemailer transporter for Outlook
+    const transporter = nodemailer.createTransport({
+      host: "smtp.office365.com",
+      port: 587,
+      secure: false, // Use STARTTLS
+      auth: {
+        user: emailUser,
+        pass: emailPassword,
+      },
+    })
+
+    // Send email using Outlook SMTP
+    const info = await transporter.sendMail({
+      from: emailUser,
+      to: "accounting@baycoaviation.com",
       subject: `PTO Request - ${ptoData.employee_name}`,
       html: emailHtml,
     })
 
-    if (error) {
-      console.error('Resend error:', error)
-      throw error
-    }
-
-    console.log('Email sent successfully:', data)
+    console.log('Email sent successfully to accounting@baycoaviation.com')
+    console.log('Message ID:', info.messageId)
 
     return new Response(
-      JSON.stringify({ success: true, data }),
+      JSON.stringify({ success: true, message: 'Email sent successfully' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

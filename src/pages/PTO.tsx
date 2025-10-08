@@ -229,7 +229,7 @@ const PTO = () => {
 
       toast({
         title: "PTO Request Submitted",
-        description: `Your request has been sent to fbayma@baycoaviation.com for approval. Confirmation will be sent to ${formData.confirmationEmail}`,
+        description: `Your request has been sent to accounting@baycoaviation.com for approval. Confirmation will be sent to ${formData.confirmationEmail}`,
       });
 
       // Reset form
@@ -277,12 +277,12 @@ const PTO = () => {
         throw error;
       }
 
-      console.log('✅ Email sent successfully to fbayma@baycoaviation.com');
+      console.log('✅ Email sent successfully to accounting@baycoaviation.com');
       console.log('Response data:', data);
       
       toast({
         title: "Email Sent Automatically! ✅",
-        description: "PTO request sent to fbayma@baycoaviation.com - no manual action needed!",
+        description: "PTO request sent to accounting@baycoaviation.com - no manual action needed!",
       });
 
     } catch (error: any) {
@@ -308,16 +308,19 @@ ${ptoData.custom_reason ? `Additional Details: ${ptoData.custom_reason}` : ''}
 
 Submitted: ${new Date(ptoData.submission_date).toLocaleString()}
 
-Please log into the admin panel to approve or reject this request.
+Approval Link: http://localhost:8080/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1
+Rejection Link: http://localhost:8080/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1
+
+Please use the links above to approve or reject this request.
       `.trim();
       
-      // Open Gmail web interface to compose email
-      const gmailComposeUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=fbayma@baycoaviation.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(gmailComposeUrl, '_blank');
+      // Open Outlook web interface to compose email
+      const outlookComposeUrl = `https://outlook.office.com/?path=/mail/action/compose&to=accounting@baycoaviation.com&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(outlookComposeUrl, '_blank');
       
       toast({
         title: "Email Service Unavailable", 
-        description: "Opened email client as fallback. Please send the email manually.",
+        description: "Opened Outlook to compose email. Please send it to complete the request.",
         variant: "default",
       });
     }
