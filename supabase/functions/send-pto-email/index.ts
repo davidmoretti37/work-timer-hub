@@ -1,31 +1,28 @@
-// @ts-nocheck
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
-import nodemailer from "npm:nodemailer@6.9.7"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { Resend } from 'npm:resend@2.0.0'
 
-const corsHeaders: Record<string, string> = {
+const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-serve(async (req: Request): Promise<Response> => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Get Outlook credentials from environment
-    const emailUser = Deno.env.get('OUTLOOK_EMAIL_USER')
-    const emailPassword = Deno.env.get('OUTLOOK_EMAIL_PASSWORD')
-    
-    if (!emailUser || !emailPassword) {
-      throw new Error('OUTLOOK_EMAIL_USER and OUTLOOK_EMAIL_PASSWORD are required')
+    // Get Resend API key from environment
+    const resendApiKey = Deno.env.get('RESEND_API_KEY')
+    if (!resendApiKey) {
+      throw new Error('RESEND_API_KEY is required')
     }
 
+    const resend = new Resend(resendApiKey)
+
     // Parse the request body
-    const { ptoData } = await req.json().catch(() => ({ ptoData: null as any }))
+    const { ptoData } = await req.json()
 
     // Validate required fields
     if (!ptoData) {
@@ -92,49 +89,38 @@ serve(async (req: Request): Promise<Response> => {
       </div>
     `
 
-    // Configure nodemailer transporter for Outlook
-    const transporter = nodemailer.createTransport({
-      host: "smtp.office365.com",
-      port: 587,
-      secure: false, // Use STARTTLS
-      auth: {
-        user: emailUser,
-        pass: emailPassword,
-      },
-    })
-
-    // Send email using Outlook SMTP
-    const info = await transporter.sendMail({
-      from: emailUser,
-      to: "accounting@baycoaviation.com",
-      subject: `PTO Request - ${ptoData.employee_name}`,
+    // TEMPORARY: Send to davidmoretti37@gmail.com for testing
+    // Forward these emails to accounting@baycoaviation.com manually
+    const { data, error } = await resend.emails.send({
+      from: 'PTO System <onboarding@resend.dev>',
+      to: ['davidmoretti37@gmail.com'],
+      subject: `PTO Request - ${ptoData.employee_name} (Forward to Accounting)`,
       html: emailHtml,
     })
 
-    console.log('Email sent successfully to accounting@baycoaviation.com')
-    console.log('Message ID:', info.messageId)
+    if (error) {
+      console.error('Resend error:', error)
+      throw error
+    }
+
+    console.log('Email sent successfully to accounting@baycoaviation.com:', data)
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Email sent successfully' }),
+      JSON.stringify({ success: true, data }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       },
     )
 
-  } catch (error: unknown) {
-    const err = error as any
-    try {
-      console.error('Function error:', err?.message || err)
-      if (err) console.error('Error details:', JSON.stringify(err, null, 2))
-    } catch (_) {
-      // ignore JSON stringify issues
-    }
+  } catch (error) {
+    console.error('Function error:', error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
     
     return new Response(
       JSON.stringify({ 
-        error: (err?.message as string) || 'Failed to send email',
-        details: String(err),
+        error: error.message || 'Failed to send email',
+        details: String(error),
         success: false 
       }),
       {

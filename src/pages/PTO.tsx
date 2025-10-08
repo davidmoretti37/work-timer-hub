@@ -224,12 +224,12 @@ const PTO = () => {
 
       console.log('PTO request created with token:', data.approval_token);
 
-      // Send email notification
-      await sendEmailNotification(data);
+      // Open Outlook to manually send email
+      openEmailClient(data);
 
       toast({
         title: "PTO Request Submitted",
-        description: `Your request has been sent to accounting@baycoaviation.com for approval. Confirmation will be sent to ${formData.confirmationEmail}`,
+        description: `Please send the email that just opened to complete your request. Confirmation will be sent to ${formData.confirmationEmail}`,
       });
 
       // Reset form
@@ -258,44 +258,9 @@ const PTO = () => {
     }
   };
 
-  const sendEmailNotification = async (ptoData: any) => {
-    try {
-      console.log('Sending automatic email notification via Supabase Edge Function...');
-      console.log('PTO Data being sent:', {
-        employee_name: ptoData.employee_name,
-        has_approval_token: !!ptoData.approval_token,
-        approval_token: ptoData.approval_token
-      });
-      
-      // Send email using Supabase Edge Function with Resend
-      const { data, error } = await supabase.functions.invoke('send-pto-email', {
-        body: { ptoData }
-      });
-
-      if (error) {
-        console.error('Edge Function error response:', error);
-        throw error;
-      }
-
-      console.log('✅ Email sent successfully to accounting@baycoaviation.com');
-      console.log('Response data:', data);
-      
-      toast({
-        title: "Email Sent Automatically! ✅",
-        description: "PTO request sent to accounting@baycoaviation.com - no manual action needed!",
-      });
-
-    } catch (error: any) {
-      console.error('❌ Email sending failed:', error);
-      console.error('Error name:', error.name);
-      console.error('Error message:', error.message);
-      console.error('Error context:', error.context);
-      
-      // Fallback: Open email client if automatic sending fails
-      console.log('Automatic email failed, falling back to email client...');
-      
-      const subject = `PTO Request - ${ptoData.employee_name}`;
-      const body = `
+  const openEmailClient = (ptoData: any) => {
+    const subject = `PTO Request - ${ptoData.employee_name}`;
+    const body = `
 New PTO Request Submitted:
 
 Employee: ${ptoData.employee_name}
@@ -308,22 +273,16 @@ ${ptoData.custom_reason ? `Additional Details: ${ptoData.custom_reason}` : ''}
 
 Submitted: ${new Date(ptoData.submission_date).toLocaleString()}
 
-Approval Link: http://localhost:8080/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1
-Rejection Link: http://localhost:8080/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1
+APPROVE this request: http://localhost:8080/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1
 
-Please use the links above to approve or reject this request.
-      `.trim();
-      
-      // Open Outlook web interface to compose email
-      const outlookComposeUrl = `https://outlook.office.com/?path=/mail/action/compose&to=accounting@baycoaviation.com&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(outlookComposeUrl, '_blank');
-      
-      toast({
-        title: "Email Service Unavailable", 
-        description: "Opened Outlook to compose email. Please send it to complete the request.",
-        variant: "default",
-      });
-    }
+REJECT this request: http://localhost:8080/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1
+
+Click one of the links above to approve or reject this request.
+    `.trim();
+    
+    // Open Outlook - will send from user's own email to fbayma@baycoaviation.com
+    const outlookComposeUrl = `https://outlook.office.com/?path=/mail/action/compose&to=fbayma@baycoaviation.com&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(outlookComposeUrl, '_blank');
   };
 
   if (!user || !profile) {
