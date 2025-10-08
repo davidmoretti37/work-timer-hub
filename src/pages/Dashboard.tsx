@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import StatusBadge from "@/components/StatusBadge";
 import TimeDisplay from "@/components/TimeDisplay";
-import { Clock, PlayCircle, StopCircle, Users, Trash2, UserX, Edit2, Save, X } from "lucide-react";
+import { Clock, PlayCircle, StopCircle, Users, Trash2, UserX, Edit2, Save, X, PauseCircle, Play } from "lucide-react";
 
 const Dashboard = () => {
   const [user, setUser] = useState<any>(null);
@@ -255,6 +255,43 @@ const Dashboard = () => {
     setLoading(false);
   };
 
+  const handlePause = async () => {
+    if (!user || !activeSession || activeSession.paused_at) return;
+    setLoading(true);
+    const { error } = await supabase
+      .from("time_sessions")
+      .update({ paused_at: new Date().toISOString() })
+      .eq("id", activeSession.id);
+    if (error) {
+      toast({ title: "Error", description: "Failed to start lunch break", variant: "destructive" });
+    } else {
+      await fetchActiveSession(user.id);
+    }
+    setLoading(false);
+  };
+
+  const handleResume = async () => {
+    if (!user || !activeSession || !activeSession.paused_at) return;
+    setLoading(true);
+    try {
+      const pausedAt = new Date(activeSession.paused_at);
+      const deltaSec = Math.max(0, Math.floor((Date.now() - pausedAt.getTime()) / 1000));
+      const newBreakSeconds = (activeSession.break_seconds || 0) + deltaSec;
+      const { error } = await supabase
+        .from("time_sessions")
+        .update({ break_seconds: newBreakSeconds, paused_at: null })
+        .eq("id", activeSession.id);
+      if (error) {
+        throw error;
+      }
+      await fetchActiveSession(user.id);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to resume from break", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!user || !profile) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
@@ -280,7 +317,7 @@ const Dashboard = () => {
                   </CardTitle>
                   <CardDescription>Your active work session</CardDescription>
                 </div>
-                <StatusBadge isClockedIn={!!activeSession} />
+                <StatusBadge isClockedIn={!!activeSession} isPaused={!!activeSession?.paused_at} />
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -297,6 +334,29 @@ const Dashboard = () => {
                     <StopCircle className="mr-2 h-5 w-5" />
                     Clock Out
                   </Button>
+                  {activeSession.paused_at ? (
+                    <Button
+                      onClick={handleResume}
+                      disabled={loading}
+                      variant="secondary"
+                      size="lg"
+                      className="w-full"
+                    >
+                      <Play className="mr-2 h-5 w-5" />
+                      Resume from Lunch Break
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handlePause}
+                      disabled={loading}
+                      variant="outline"
+                      size="lg"
+                      className="w-full"
+                    >
+                      <PauseCircle className="mr-2 h-5 w-5" />
+                      Pause for Lunch Break
+                    </Button>
+                  )}
                 </>
               ) : (
                 <Button

@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
@@ -9,8 +14,16 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   if (req.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405 });
+    return new Response("Method Not Allowed", { 
+      status: 405,
+      headers: corsHeaders 
+    });
   }
 
   try {
@@ -18,7 +31,7 @@ serve(async (req) => {
 
     if (!token || !action || !ownerName) {
       return new Response(JSON.stringify({ message: "Missing required fields" }), {
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
@@ -35,7 +48,7 @@ serve(async (req) => {
 
     if (fetchError || !request) {
       return new Response(JSON.stringify({ message: "Invalid or used token" }), {
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
@@ -43,7 +56,7 @@ serve(async (req) => {
     // Check expiry
     if (new Date(request.token_expires_at).getTime() < Date.now()) {
       return new Response(JSON.stringify({ message: "Token expired" }), {
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
@@ -68,17 +81,47 @@ serve(async (req) => {
       throw updateError;
     }
 
+    // If approved, create calendar events for each day of the PTO
+    if (action === "approve") {
+      console.log("Creating calendar events for approved PTO...");
+      
+      const startDate = new Date(request.start_date);
+      const endDate = new Date(request.end_date);
+      const calendarEvents = [];
+
+      // Generate events for each day in the date range
+      for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+        calendarEvents.push({
+          user_id: request.user_id,
+          event_date: date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+          title: `PTO: ${request.reason_type}`,
+          notes: request.custom_reason || `Approved by ${ownerName}`,
+        });
+      }
+
+      if (calendarEvents.length > 0) {
+        const { error: calendarError } = await supabaseAdmin
+          .from("calendar_events")
+          .insert(calendarEvents);
+
+        if (calendarError) {
+          console.error("Failed to create calendar events:", calendarError);
+          // Don't fail the approval if calendar creation fails
+        } else {
+          console.log(`✅ Created ${calendarEvents.length} calendar events`);
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ message: "PTO updated", pto: updated }),
-      { headers: { "Content-Type": "application/json" }, status: 200 },
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   } catch (error) {
     console.error("approve-pto error:", error);
     return new Response(
       JSON.stringify({ message: "Failed to process approval", error: String(error?.message || error) }),
-      { headers: { "Content-Type": "application/json" }, status: 400 },
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
     );
   }
 });
-
-

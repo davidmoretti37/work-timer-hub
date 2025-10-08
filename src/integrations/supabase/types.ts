@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_events: {
+        Row: {
+          id: string
+          user_id: string
+          event_date: string
+          title: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          event_date: string
+          title: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          event_date?: string
+          title?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -32,11 +67,78 @@ export type Database = {
         }
         Relationships: []
       }
+      pto_requests: {
+        Row: {
+          id: string
+          user_id: string
+          employee_name: string
+          confirmation_email: string
+          request_type: string
+          start_date: string
+          end_date: string
+          reason_type: string
+          custom_reason: string | null
+          employee_signature: string
+          status: string
+          submission_date: string
+          approval_token: string
+          token_expires_at: string
+          token_used: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          employee_name: string
+          confirmation_email: string
+          request_type: string
+          start_date: string
+          end_date: string
+          reason_type: string
+          custom_reason?: string | null
+          employee_signature: string
+          status?: string
+          submission_date?: string
+          approval_token?: string
+          token_expires_at?: string
+          token_used?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          employee_name?: string
+          confirmation_email?: string
+          request_type?: string
+          start_date?: string
+          end_date?: string
+          reason_type?: string
+          custom_reason?: string | null
+          employee_signature?: string
+          status?: string
+          submission_date?: string
+          approval_token?: string
+          token_expires_at?: string
+          token_used?: boolean
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pto_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_sessions: {
         Row: {
           clock_in: string
           clock_out: string | null
           created_at: string
+          paused_at: string | null
+          break_seconds: number
           hours_worked: number | null
           id: string
           user_id: string
@@ -45,6 +147,8 @@ export type Database = {
           clock_in?: string
           clock_out?: string | null
           created_at?: string
+          paused_at?: string | null
+          break_seconds?: number
           hours_worked?: number | null
           id?: string
           user_id: string
@@ -53,6 +157,8 @@ export type Database = {
           clock_in?: string
           clock_out?: string | null
           created_at?: string
+          paused_at?: string | null
+          break_seconds?: number
           hours_worked?: number | null
           id?: string
           user_id?: string

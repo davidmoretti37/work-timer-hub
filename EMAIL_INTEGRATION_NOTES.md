@@ -11,7 +11,7 @@ The PTO system is fully functional with the following features:
 ## Email Integration (To Be Implemented)
 
 ### Email Workflow
-1. **Employee submits PTO** → Email sent to `davidmoretti37@gmail.com`
+1. **Employee submits PTO** → Email sent to `fbayma@baycoaviation.com`
 2. **Admin approves/rejects** → Confirmation email sent to employee's specified email
 
 ### Required Setup
@@ -36,7 +36,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 serve(async (req) => {
   const { ptoData } = await req.json()
   
-  // Send email to davidmoretti37@gmail.com
+  // Send email to fbayma@baycoaviation.com
   // Include PTO form data and approval/rejection buttons
   
   return new Response(JSON.stringify({ success: true }))
@@ -77,7 +77,7 @@ const sendConfirmationEmail = async (ptoData: any, decision: 'approved' | 'rejec
 
 ### Email Content
 
-#### Admin Notification Email (to davidmoretti37@gmail.com):
+#### Admin Notification Email (to fbayma@baycoaviation.com):
 - Employee name and confirmation email
 - PTO dates, reason, and type (days/hours)
 - Employee signature display

@@ -24,6 +24,17 @@ serve(async (req) => {
     // Parse the request body
     const { ptoData } = await req.json()
 
+    // Validate required fields
+    if (!ptoData) {
+      throw new Error('ptoData is required')
+    }
+
+    if (!ptoData.approval_token) {
+      throw new Error('approval_token is missing from ptoData')
+    }
+
+    console.log('Processing PTO request with token:', ptoData.approval_token)
+
     // Create email content
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -78,10 +89,12 @@ serve(async (req) => {
       </div>
     `
 
-    // Send the email using onboarding@resend.dev (works without domain verification)
-        const { data, error } = await resend.emails.send({
-          from: 'PTO System <onboarding@resend.dev>',
-          to: ['fbayma@baycoaviation.com'],
+    // IMPORTANT: Resend free tier only allows sending to the account owner's email
+    // For testing, we always send to davidmoretti37@gmail.com
+    // To send to other emails, you need to verify a domain at resend.com/domains
+    const { data, error } = await resend.emails.send({
+      from: 'PTO System <onboarding@resend.dev>',
+      to: ['davidmoretti37@gmail.com'], // Must be account owner email for testing
       subject: `PTO Request - ${ptoData.employee_name}`,
       html: emailHtml,
     })
@@ -103,10 +116,12 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Function error:', error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
     
     return new Response(
       JSON.stringify({ 
         error: error.message || 'Failed to send email',
+        details: String(error),
         success: false 
       }),
       {

@@ -10,7 +10,7 @@ I've implemented **Resend + Supabase Edge Functions** which works perfectly with
 - **Professional email service** - uses Resend (trusted by companies)
 - **Supabase Edge Function** - handles email sending securely
 - **Beautiful HTML emails** - professional formatting
-- **Automatic delivery** to davidmoretti37@gmail.com
+- **Automatic delivery** to fbayma@baycoaviation.com
 
 ## 📧 Setup Instructions (10 minutes)
 
@@ -50,7 +50,7 @@ from: 'PTO System <pto@yourcompany.com>', // Instead of generic domain
 ### Professional Email Format:
 ```
 From: PTO System <noreply@yourdomain.com>
-To: davidmoretti37@gmail.com  
+To: fbayma@baycoaviation.com  
 Subject: PTO Request - John Smith
 
 [Beautiful HTML email with:]
@@ -94,7 +94,7 @@ supabase secrets set RESEND_API_KEY=re_your_actual_api_key_here
 
 1. **Deploy the function** (commands above)
 2. **Submit test PTO** at http://localhost:8080/pto
-3. **Check davidmoretti37@gmail.com** - should receive beautiful HTML email instantly!
+3. **Check fbayma@baycoaviation.com** - should receive beautiful HTML email instantly!
 
 ## 🔍 Troubleshooting
 

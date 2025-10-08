@@ -89,16 +89,14 @@ const PTO = () => {
       setProfile(data);
       setFormData(prev => ({
         ...prev,
-        employeeName: data.display_name || data.email || "",
-        confirmationEmail: data.email || ""
+        employeeName: data.full_name || user?.email || "",
+        confirmationEmail: user?.email || ""
       }));
     } else {
       // logout and redirect if no profile exists
-      try { // local scope preferred
-        // @ts-expect-error runtime supports scope
-        await supabase.auth.signOut({ scope: 'local' });
+      try {
+        await supabase.auth.signOut();
       } catch (_) {}
-      try { await supabase.auth.signOut(); } catch (_) {}
       navigate('/auth', { replace: true });
       return;
     }
@@ -213,14 +211,20 @@ const PTO = () => {
           status: "pending",
           submission_date: new Date().toISOString(),
         })
-        .select()
+        .select('*, approval_token')
         .single();
 
       if (error) {
         throw error;
       }
 
-      // Send email notification (this would need to be implemented with a backend service)
+      if (!data) {
+        throw new Error('Failed to create PTO request');
+      }
+
+      console.log('PTO request created with token:', data.approval_token);
+
+      // Send email notification
       await sendEmailNotification(data);
 
       toast({
@@ -230,8 +234,8 @@ const PTO = () => {
 
       // Reset form
       setFormData({
-        employeeName: profile?.display_name || profile?.email || "",
-        confirmationEmail: profile?.email || "",
+        employeeName: profile?.full_name || user?.email || "",
+        confirmationEmail: user?.email || "",
         requestType: "days",
         startDate: undefined,
         endDate: undefined,
@@ -257,6 +261,11 @@ const PTO = () => {
   const sendEmailNotification = async (ptoData: any) => {
     try {
       console.log('Sending automatic email notification via Supabase Edge Function...');
+      console.log('PTO Data being sent:', {
+        employee_name: ptoData.employee_name,
+        has_approval_token: !!ptoData.approval_token,
+        approval_token: ptoData.approval_token
+      });
       
       // Send email using Supabase Edge Function with Resend
       const { data, error } = await supabase.functions.invoke('send-pto-email', {
@@ -264,10 +273,12 @@ const PTO = () => {
       });
 
       if (error) {
+        console.error('Edge Function error response:', error);
         throw error;
       }
 
       console.log('✅ Email sent successfully to fbayma@baycoaviation.com');
+      console.log('Response data:', data);
       
       toast({
         title: "Email Sent Automatically! ✅",
@@ -276,6 +287,9 @@ const PTO = () => {
 
     } catch (error: any) {
       console.error('❌ Email sending failed:', error);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error context:', error.context);
       
       // Fallback: Open email client if automatic sending fails
       console.log('Automatic email failed, falling back to email client...');

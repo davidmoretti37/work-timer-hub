@@ -66,7 +66,7 @@ const ApprovePTO = () => {
     };
 
     fetchPTORequest();
-  }, [requestId, action, token, navigate, toast]);
+  }, [action, token, navigate, toast]);
 
   const handleSignatureChange = (signature: string) => {
     setOwnerSignature(signature);
