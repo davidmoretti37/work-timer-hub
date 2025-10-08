@@ -280,9 +280,11 @@ REJECT this request: http://localhost:8080/approve-pto?action=reject&token=${pto
 Click one of the links above to approve or reject this request.
     `.trim();
     
-    // Open Outlook - will send from user's own email to fbayma@baycoaviation.com
-    const outlookComposeUrl = `https://outlook.office.com/?path=/mail/action/compose&to=fbayma@baycoaviation.com&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(outlookComposeUrl, '_blank');
+    // ALWAYS use Gmail (it works better than Outlook web)
+    // Users can add their Outlook email to Gmail and send from any address
+    const emailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=fbayma@baycoaviation.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    window.open(emailUrl, '_blank');
   };
 
   if (!user || !profile) {
