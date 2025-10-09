@@ -259,6 +259,8 @@ const PTO = () => {
   };
 
   const openEmailClient = (ptoData: any) => {
+    // Use the current domain (works for both localhost dev and production)
+    const baseUrl = window.location.origin;
     const subject = `PTO Request - ${ptoData.employee_name}`;
     const body = `
 New PTO Request Submitted:
@@ -273,9 +275,9 @@ ${ptoData.custom_reason ? `Additional Details: ${ptoData.custom_reason}` : ''}
 
 Submitted: ${new Date(ptoData.submission_date).toLocaleString()}
 
-APPROVE this request: http://localhost:8080/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1
+APPROVE this request: ${baseUrl}/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1
 
-REJECT this request: http://localhost:8080/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1
+REJECT this request: ${baseUrl}/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1
 
 Click one of the links above to approve or reject this request.
     `.trim();
