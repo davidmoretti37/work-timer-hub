@@ -35,8 +35,8 @@ serve(async (req) => {
 
     console.log('Processing PTO request with token:', ptoData.approval_token)
 
-    // Get base URL for environment
-    const BASE_URL = Deno.env.get('BASE_URL') || 'http://localhost:8080';
+    // Get base URL for environment - hardcoded for production
+    const BASE_URL = 'https://work-timer-hub-production.up.railway.app';
     console.log('Using BASE_URL:', BASE_URL);
 
     // Create email content
