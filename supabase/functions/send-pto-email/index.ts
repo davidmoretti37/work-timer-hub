@@ -73,14 +73,14 @@ serve(async (req) => {
         <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, #007bff, #0056b3); color: white; border-radius: 8px; text-align: center;">
           <h3 style="margin: 0 0 15px 0;">Action Required</h3>
           <p style="margin: 0 0 20px 0;">Click a button below to approve or reject this PTO request</p>
-          
+
           <div style="margin-top: 20px;">
-            <a href="http://localhost:8080/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1" 
+            <a href="${Deno.env.get('RAILWAY_STATIC_URL') || 'https://your-domain.railway.app'}/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1"
                style="display: inline-block; margin: 0 10px; padding: 12px 25px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
               ✅ APPROVE
             </a>
-            
-            <a href="http://localhost:8080/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1" 
+
+            <a href="${Deno.env.get('RAILWAY_STATIC_URL') || 'https://your-domain.railway.app'}/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1"
                style="display: inline-block; margin: 0 10px; padding: 12px 25px; background: #dc3545; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
               ❌ REJECT
             </a>
