@@ -35,8 +35,8 @@ serve(async (req) => {
 
     console.log('Processing PTO request with token:', ptoData.approval_token)
 
-    // Get base URL for environment - hardcoded for production
-    const BASE_URL = 'https://work-timer-hub-production.up.railway.app';
+    // Get base URL from environment variable, fallback to Vercel domain
+    const BASE_URL = Deno.env.get('FRONTEND_URL') || 'https://work-timer-hub.vercel.app';
     console.log('Using BASE_URL:', BASE_URL);
 
     // Create email content
