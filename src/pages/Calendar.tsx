@@ -24,6 +24,8 @@ const Calendar = () => {
   const [newEventTitle, setNewEventTitle] = useState("");
   const [newEventNotes, setNewEventNotes] = useState("");
   const [savingEvent, setSavingEvent] = useState(false);
+  const [monthEventsByDate, setMonthEventsByDate] = useState<Record<string, any[]>>({});
+  const [newEventFiles, setNewEventFiles] = useState<File[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -90,6 +92,13 @@ const Calendar = () => {
       supabase.removeChannel(channel);
     };
   }, [user, isAdmin]);
+
+  // Fetch all events for the currently visible month (for grid rendering)
+  useEffect(() => {
+    if (user) {
+      fetchMonthEvents();
+    }
+  }, [currentDate, user, isAdmin]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -165,6 +174,42 @@ const Calendar = () => {
     await fetchEventsForDate(date);
   };
 
+  const fetchMonthEvents = async () => {
+    try {
+      // Compute the visible calendar range (full weeks around the month)
+      const monthStartDate = startOfMonth(currentDate);
+      const monthEndDate = endOfMonth(monthStartDate);
+      const rangeStart = startOfWeek(monthStartDate);
+      const rangeEnd = endOfWeek(monthEndDate);
+
+      const startIso = new Date(Date.UTC(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate())).toISOString().slice(0,10);
+      const endIso = new Date(Date.UTC(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate())).toISOString().slice(0,10);
+
+      let query = supabase
+        .from("calendar_events")
+        .select("*")
+        .gte("event_date", startIso)
+        .lte("event_date", endIso);
+
+      if (!isAdmin && user) {
+        query = query.eq("user_id", user.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const map: Record<string, any[]> = {};
+      (data || []).forEach((evt: any) => {
+        const key = typeof evt.event_date === 'string' ? evt.event_date : new Date(evt.event_date).toISOString().slice(0,10);
+        if (!map[key]) map[key] = [];
+        map[key].push(evt);
+      });
+      setMonthEventsByDate(map);
+    } catch (e) {
+      console.error("Error fetching month events:", e);
+    }
+  };
+
   const fetchEventsForDate = async (date: Date) => {
     try {
       const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString().slice(0,10);
@@ -190,6 +235,23 @@ const Calendar = () => {
     setSavingEvent(true);
     try {
       const iso = new Date(Date.UTC(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate())).toISOString().slice(0,10);
+      // Upload files (images/PDFs) to Supabase Storage
+      const attachments: any[] = [];
+      for (const file of newEventFiles) {
+        try {
+          const uniqueName = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+          const filePath = `${user.id}/${iso}/${uniqueName}_${file.name}`;
+          const uploadRes = await supabase.storage
+            .from('event-attachments')
+            .upload(filePath, file, { upsert: true, contentType: file.type });
+          if (uploadRes.error) throw uploadRes.error;
+          const { data: pub } = supabase.storage.from('event-attachments').getPublicUrl(filePath);
+          attachments.push({ name: file.name, url: pub.publicUrl, type: file.type, size: file.size });
+        } catch (uploadErr:any) {
+          console.error('Attachment upload failed:', uploadErr);
+          throw uploadErr;
+        }
+      }
       const { error } = await supabase
         .from("calendar_events")
         .insert({
@@ -197,15 +259,45 @@ const Calendar = () => {
           event_date: iso,
           title: newEventTitle.trim(),
           notes: newEventNotes.trim() || null,
+          attachments: attachments,
         });
       if (error) throw error;
       setNewEventTitle("");
       setNewEventNotes("");
+      setNewEventFiles([]);
       await fetchEventsForDate(selectedDate);
+      await fetchMonthEvents();
+      toast({ title: 'Event saved', description: 'Your event was added to this day.' });
+      setIsDayOpen(false);
     } catch (e:any) {
       console.error("Failed to save event:", e);
+      toast({
+        title: 'Failed to save event',
+        description: e?.message || 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setSavingEvent(false);
+    }
+  };
+
+  const deleteEvent = async (eventId: string) => {
+    try {
+      const { error } = await supabase
+        .from('calendar_events')
+        .delete()
+        .eq('id', eventId);
+      if (error) throw error;
+      toast({ title: 'Event deleted', description: 'Your event was removed.' });
+      if (selectedDate) await fetchEventsForDate(selectedDate);
+      await fetchMonthEvents();
+    } catch (e:any) {
+      console.error('Failed to delete event:', e);
+      toast({
+        title: 'Failed to delete event',
+        description: e?.message || 'An unknown error occurred while deleting.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -339,6 +431,8 @@ const Calendar = () => {
                 const isCurrentMonth = isSameMonth(date, currentDate);
                 const isCurrentDay = isToday(date);
                 const ptoForDate = getPTOForDate(date);
+                const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString().slice(0,10);
+                const eventsForDay = monthEventsByDate[iso] || [];
                 
                 return (
                   <div
@@ -374,6 +468,22 @@ const Calendar = () => {
                           </div>
                         </div>
                       ))}
+                    </div>
+
+                    {/* Custom Events */}
+                    <div className="space-y-1 mt-1">
+                      {eventsForDay.slice(0, 2).map((evt: any) => (
+                        <div
+                          key={evt.id}
+                          className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded truncate border border-emerald-200"
+                          title={evt.notes ? `${evt.title} — ${evt.notes}` : evt.title}
+                        >
+                          {evt.title}
+                        </div>
+                      ))}
+                      {eventsForDay.length > 2 && (
+                        <div className="text-[10px] text-muted-foreground">+{eventsForDay.length - 2} more</div>
+                      )}
                     </div>
                   </div>
                 );
@@ -417,6 +527,42 @@ const Calendar = () => {
             </div>
           </div>
 
+          {/* Custom Events list */}
+          <div className="mt-4 space-y-2">
+            <h4 className="font-semibold">Your Events</h4>
+            {events.length === 0 && (
+              <div className="text-sm text-muted-foreground">No events for this date.</div>
+            )}
+            <div className="space-y-2">
+              {events.map((evt) => (
+                <div key={evt.id} className="flex items-center justify-between border rounded p-2 bg-card">
+                  <div className="text-sm">
+                    <div className="font-medium">{evt.title}</div>
+                    {evt.notes && <div className="opacity-75">{evt.notes}</div>}
+                    {Array.isArray(evt.attachments) && evt.attachments.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {evt.attachments.map((att: any, idx: number) => (
+                          <div key={idx} className="text-xs">
+                            {att.type?.startsWith('image/') ? (
+                              <a href={att.url} target="_blank" rel="noreferrer" className="underline">Image: {att.name}</a>
+                            ) : (
+                              <a href={att.url} target="_blank" rel="noreferrer" className="underline">File: {att.name}</a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => deleteEvent(evt.id)} className="border-destructive text-destructive">
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Add Event */}
           <div className="mt-4 space-y-2">
             <h4 className="font-semibold">Add Event</h4>
@@ -428,6 +574,13 @@ const Calendar = () => {
               <div>
                 <Label htmlFor="eventNotes">Notes</Label>
                 <Textarea id="eventNotes" value={newEventNotes} onChange={(e)=>setNewEventNotes(e.target.value)} placeholder="Optional notes" />
+              </div>
+              <div>
+                <Label htmlFor="eventFiles">Attachments</Label>
+                <Input id="eventFiles" type="file" accept="image/*,application/pdf" multiple onChange={(e)=>setNewEventFiles(Array.from(e.target.files || []))} />
+                {newEventFiles.length > 0 && (
+                  <div className="text-xs text-muted-foreground mt-1">{newEventFiles.length} file(s) selected</div>
+                )}
               </div>
             </div>
           </div>
