@@ -35,6 +35,10 @@ serve(async (req) => {
 
     console.log('Processing PTO request with token:', ptoData.approval_token)
 
+    // Get base URL for environment
+    const BASE_URL = Deno.env.get('BASE_URL') || 'http://localhost:8080';
+    console.log('Using BASE_URL:', BASE_URL);
+
     // Create email content
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -75,12 +79,12 @@ serve(async (req) => {
           <p style="margin: 0 0 20px 0;">Click a button below to approve or reject this PTO request</p>
 
           <div style="margin-top: 20px;">
-            <a href="https://work-timer-hub-production.up.railway.app/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1"
+            <a href="${BASE_URL}/approve-pto?action=approve&token=${ptoData.approval_token}&plain=1"
                style="display: inline-block; margin: 0 10px; padding: 12px 25px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
               ✅ APPROVE
             </a>
 
-            <a href="https://work-timer-hub-production.up.railway.app/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1"
+            <a href="${BASE_URL}/approve-pto?action=reject&token=${ptoData.approval_token}&plain=1"
                style="display: inline-block; margin: 0 10px; padding: 12px 25px; background: #dc3545; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">
               ❌ REJECT
             </a>
