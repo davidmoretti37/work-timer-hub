@@ -17,10 +17,10 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 220 13% 13%;
 
-    --primary: 217 91% 60%;
+    --primary: 0 0% 12%;
     --primary-foreground: 0 0% 100%;
     
-    --primary-hover: 217 91% 55%;
+    --primary-hover: 0 0% 20%;
 
     --secondary: 220 13% 95%;
     --secondary-foreground: 220 13% 13%;
@@ -39,7 +39,7 @@ All colors MUST be HSL.
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 217 91% 60%;
+    --ring: 0 0% 18%;
 
     --radius: 0.75rem;
 
@@ -56,10 +56,10 @@ All colors MUST be HSL.
     --popover: 220 14% 10%;
     --popover-foreground: 220 13% 97%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
     
-    --primary-hover: 217 91% 65%;
+    --primary-hover: 0 0% 90%;
 
     --secondary: 220 13% 15%;
     --secondary-foreground: 220 13% 97%;
@@ -78,7 +78,7 @@ All colors MUST be HSL.
 
     --border: 220 13% 15%;
     --input: 220 13% 15%;
-    --ring: 217 91% 60%;
+    --ring: 0 0% 100%;
   }
 }
 
@@ -89,5 +89,11 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .container-shadow {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1) !important;
   }
 }

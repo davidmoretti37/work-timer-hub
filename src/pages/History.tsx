@@ -73,10 +73,10 @@ const History = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Navbar isAdmin={isAdmin} />
       
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pt-32">
         <div className="max-w-4xl mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
@@ -86,7 +86,7 @@ const History = () => {
             <p className="text-muted-foreground">View all your work sessions</p>
           </div>
 
-          <Card className="mb-6">
+          <Card className="mb-6 container-shadow">
             <CardHeader>
               <CardTitle>Summary</CardTitle>
               <CardDescription>Your total hours worked</CardDescription>
@@ -103,7 +103,7 @@ const History = () => {
 
           <div className="space-y-4">
             {sessions.length === 0 ? (
-              <Card className="p-8 text-center">
+              <Card className="p-8 text-center container-shadow">
                 <p className="text-muted-foreground">No sessions yet. Start by clocking in!</p>
               </Card>
             ) : (

@@ -378,11 +378,11 @@ const Calendar = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Navbar isAdmin={isAdmin} />
       
-      <main className="container mx-auto px-4 py-8">
-        <Card>
+      <main className="container mx-auto px-4 py-8 pt-32">
+        <Card className="container-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
             <CardTitle className="text-2xl font-bold">
               {format(currentDate, "MMMM yyyy")}
@@ -494,7 +494,7 @@ const Calendar = () => {
       </main>
       {/* Day Modal */}
       <Dialog open={isDayOpen} onOpenChange={setIsDayOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl container-shadow">
           <DialogHeader>
             <DialogTitle>
               {selectedDate ? format(selectedDate, "PPP") : "Selected Day"}

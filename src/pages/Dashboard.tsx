@@ -297,17 +297,17 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Navbar isAdmin={isAdmin} />
       
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pt-32">
         <div className="max-w-3xl mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Welcome back, {profile.full_name}!</h1>
             <p className="text-muted-foreground">Track your work hours easily</p>
           </div>
 
-          <Card className="mb-6">
+          <Card className="mb-6 container-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -374,7 +374,7 @@ const Dashboard = () => {
 
           {/* Admin User Management Section */}
           {isAdmin && (
-            <Card className="mt-8">
+            <Card className="mt-8 container-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />

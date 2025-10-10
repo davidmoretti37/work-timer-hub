@@ -50,7 +50,7 @@ const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAd
   };
 
   return (
-    <Card className="p-4 hover:shadow-md transition-shadow">
+    <Card className="p-4 hover:shadow-md transition-shadow container-shadow">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-primary" />

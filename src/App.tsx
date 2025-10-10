@@ -20,7 +20,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
+        <div className="min-h-screen bg-background">
+          <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
@@ -30,7 +31,8 @@ const App = () => (
           <Route path="/approve-pto" element={<ApprovePTO />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
-        </Routes>
+          </Routes>
+        </div>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

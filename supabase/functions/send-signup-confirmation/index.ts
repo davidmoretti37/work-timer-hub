@@ -55,60 +55,57 @@ serve(async (req: Request) => {
     const ENV_REDIRECT = Deno.env.get("CONFIRM_REDIRECT_URL");
     const finalRedirect = ENV_REDIRECT || (redirectTo || "");
 
-    // Prefer signup confirmation links (mark user confirmed), fall back to magic links
+    // ONLY use signup confirmation links (email confirmation with button), NO magic links
     let actionLink = "";
     let lastError: any = null;
-    let linkKind: "signup" | "magiclink" | "" = "";
+    const linkKind: "signup" = "signup";
 
-    // 1) signup with redirect
+    // Try signup with redirect first
     if (finalRedirect) {
-      const { data, error } = await admin.auth.admin.generateLink({ type: "signup", email, options: { emailRedirectTo: finalRedirect } });
-      if (!error && data?.action_link) {
-        actionLink = data.action_link;
-        linkKind = "signup";
+      const { data, error } = await admin.auth.admin.generateLink({ 
+        type: "signup", 
+        email, 
+        options: { emailRedirectTo: finalRedirect } 
+      });
+      
+      if (!error && data?.properties?.action_link) {
+        actionLink = data.properties.action_link;
         console.log("[send-signup-confirmation] Generated signup link (with redirect)", { reqId });
+      } else if (!error && data?.action_link) {
+        actionLink = data.action_link;
+        console.log("[send-signup-confirmation] Generated signup link (with redirect, legacy format)", { reqId });
       } else {
         lastError = error || new Error("No action_link from signup with redirect");
-        console.warn("[send-signup-confirmation] Signup with redirect failed", { reqId, error: error?.message });
+        console.warn("[send-signup-confirmation] Signup with redirect failed", { 
+          reqId, 
+          error: error?.message,
+          errorDetails: JSON.stringify(error),
+          dataReceived: JSON.stringify(data)
+        });
       }
     }
 
-    // 2) signup without redirect
+    // If that failed, try without redirect
     if (!actionLink) {
-      const { data, error } = await admin.auth.admin.generateLink({ type: "signup", email });
-      if (!error && data?.action_link) {
-        actionLink = data.action_link;
-        linkKind = "signup";
+      const { data, error } = await admin.auth.admin.generateLink({ 
+        type: "signup", 
+        email 
+      });
+      
+      if (!error && data?.properties?.action_link) {
+        actionLink = data.properties.action_link;
         console.log("[send-signup-confirmation] Generated signup link (no redirect)", { reqId });
+      } else if (!error && data?.action_link) {
+        actionLink = data.action_link;
+        console.log("[send-signup-confirmation] Generated signup link (no redirect, legacy format)", { reqId });
       } else {
         lastError = error || lastError || new Error("No action_link from signup without redirect");
-        console.warn("[send-signup-confirmation] Signup without redirect failed", { reqId, error: error?.message });
-      }
-    }
-
-    // 3) magiclink with redirect
-    if (!actionLink && finalRedirect) {
-      const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email, options: { emailRedirectTo: finalRedirect } });
-      if (!error && data?.action_link) {
-        actionLink = data.action_link;
-        linkKind = "magiclink";
-        console.log("[send-signup-confirmation] Generated magic link (with redirect)", { reqId });
-      } else {
-        lastError = error || lastError || new Error("No action_link from magiclink with redirect");
-        console.warn("[send-signup-confirmation] Magiclink with redirect failed", { reqId, error: error?.message });
-      }
-    }
-
-    // 4) magiclink without redirect
-    if (!actionLink) {
-      const { data, error } = await admin.auth.admin.generateLink({ type: "magiclink", email });
-      if (!error && data?.action_link) {
-        actionLink = data.action_link;
-        linkKind = "magiclink";
-        console.log("[send-signup-confirmation] Generated magic link (no redirect)", { reqId });
-      } else {
-        lastError = error || lastError || new Error("No action_link from magiclink without redirect");
-        console.warn("[send-signup-confirmation] Magiclink without redirect failed", { reqId, error: error?.message });
+        console.warn("[send-signup-confirmation] Signup without redirect failed", { 
+          reqId, 
+          error: error?.message,
+          errorDetails: JSON.stringify(error),
+          dataReceived: JSON.stringify(data)
+        });
       }
     }
 
@@ -132,12 +129,9 @@ serve(async (req: Request) => {
     }
 
     const resend = new Resend(RESEND_API_KEY);
-    const isSignup = linkKind === "signup";
-    const subject = isSignup ? "Confirm your account" : "Sign in to your account";
-    const cta = isSignup ? "Confirm email" : "Sign in";
-    const intro = isSignup
-      ? "Click the button below to confirm your email."
-      : "Click the button below to sign in.";
+    const subject = "Confirm your account";
+    const cta = "Confirm Email";
+    const intro = "Click the button below to confirm your email and activate your account.";
     const sendRes = await resend.emails.send({
       from: "PTO System <onboarding@resend.dev>",
       to: [email],
@@ -160,5 +154,3 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: e?.message || "Unexpected error" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
-
-

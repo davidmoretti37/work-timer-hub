@@ -596,10 +596,10 @@ const Admin = () => {
   const uniqueUserIds = [...new Set(sessions.map(s => s.user_id))];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Navbar isAdmin={isAdmin} />
       
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 pt-32">
         <div className="max-w-6xl mx-auto">
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
@@ -639,7 +639,7 @@ const Admin = () => {
                 const currentFilter = userFilters.get(userId);
                 
                 return (
-                  <Card key={userId}>
+                  <Card key={userId} className="container-shadow">
                     <CardHeader>
                       <div className="flex justify-between items-start">
                         <div className="flex-1">

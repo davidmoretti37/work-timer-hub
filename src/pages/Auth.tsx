@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Clock } from "lucide-react";
+import { MetalButton } from "@/components/ui/metal-button";
+import LiquidEther from "@/components/LiquidEther";
 
 const Auth = () => {
   const SITE_URL = (import.meta as any).env?.VITE_PUBLIC_SITE_URL || window.location.origin;
@@ -138,8 +140,22 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen relative flex items-center justify-center p-4">
+      <div className="absolute inset-0 -z-10">
+        <LiquidEther
+          colors={["#121212", "#1f1f1f", "#161616"]}
+          autoDemo={true}
+          autoSpeed={0.4}
+          autoIntensity={2.0}
+          takeoverDuration={0.25}
+          autoResumeDelay={3000}
+          autoRampDuration={0.6}
+          resolution={0.6}
+          cursorSize={120}
+          mouseForce={18}
+        />
+      </div>
+      <Card className="w-full max-w-md container-shadow">
         <CardHeader className="space-y-3 text-center">
           <div className="mx-auto w-12 h-12 bg-primary rounded-full flex items-center justify-center">
             <Clock className="h-6 w-6 text-primary-foreground" />
@@ -191,9 +207,14 @@ const Auth = () => {
                 minLength={6}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <MetalButton
+              type="submit"
+              fullWidth
+              variant="default"
+              disabled={loading}
+            >
               {loading ? "Loading..." : isLogin ? "Sign In" : "Sign Up"}
-            </Button>
+            </MetalButton>
           </form>
 
           <div className="mt-4 text-center text-sm">

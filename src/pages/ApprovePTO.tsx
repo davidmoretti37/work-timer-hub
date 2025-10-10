@@ -164,7 +164,7 @@ const ApprovePTO = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <FileText className="h-12 w-12 mx-auto mb-4 text-primary" />
           <p>Loading PTO request...</p>
@@ -175,8 +175,8 @@ const ApprovePTO = () => {
 
   if (!ptoRequest) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="w-full max-w-md">
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="w-full max-w-md container-shadow">
           <CardContent className="pt-6 text-center">
             <XCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
             <h3 className="text-lg font-semibold mb-2">Request Not Found</h3>
@@ -190,11 +190,11 @@ const ApprovePTO = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       {/* No Navbar - this page should work without login */}
       
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <Card>
+        <Card className="container-shadow">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
               {action === "approve" ? (

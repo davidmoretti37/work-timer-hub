@@ -294,11 +294,11 @@ Click one of the links above to approve or reject this request.
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <Navbar isAdmin={isAdmin} />
       
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <Card>
+      <main className="container mx-auto px-4 py-8 pt-32 max-w-4xl">
+        <Card className="container-shadow">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
               <FileText className="h-6 w-6" />
