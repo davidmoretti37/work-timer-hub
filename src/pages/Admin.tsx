@@ -628,6 +628,8 @@ const Admin = () => {
                   isAdmin={true}
                   onUpdate={handleUpdateSession}
                   onDelete={handleDeleteSession}
+                  pausedAt={session.paused_at}
+                  breakSeconds={session.break_seconds}
                 />
               ))}
             </TabsContent>
@@ -757,6 +759,8 @@ const Admin = () => {
                               isAdmin={true}
                               onUpdate={handleUpdateSession}
                               onDelete={handleDeleteSession}
+                              pausedAt={session.paused_at}
+                              breakSeconds={session.break_seconds}
                             />
                           ));
                         }
@@ -786,6 +790,8 @@ const Admin = () => {
                                     isAdmin={true}
                                     onUpdate={handleUpdateSession}
                                     onDelete={handleDeleteSession}
+                                    pausedAt={session.paused_at}
+                                    breakSeconds={session.break_seconds}
                                   />
                                 ))}
                               </div>

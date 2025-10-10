@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { Clock, Edit2, Save, X, Trash2 } from "lucide-react";
 import StatusBadge from "./StatusBadge";
-import { formatHoursToReadable } from "@/utils/timeUtils";
+import { formatHoursToReadable, formatBreakTime } from "@/utils/timeUtils";
 import { useState } from "react";
 
 interface SessionCardProps {
@@ -16,10 +16,13 @@ interface SessionCardProps {
   isAdmin?: boolean;
   onUpdate?: (sessionId: string, clockIn: string, clockOut: string | null) => void;
   onDelete?: (sessionId: string) => void;
+  pausedAt?: string | null;
+  breakSeconds?: number | null;
 }
 
-const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAdmin, onUpdate, onDelete }: SessionCardProps) => {
+const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAdmin, onUpdate, onDelete, pausedAt, breakSeconds }: SessionCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const showBreakInfo = pausedAt || (breakSeconds && breakSeconds > 0);
   const [editClockIn, setEditClockIn] = useState('');
   const [editClockOut, setEditClockOut] = useState('');
   const isActive = !clockOut;
@@ -143,13 +146,22 @@ const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAd
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div>
             <div className="text-xs text-muted-foreground mb-1">Clock In</div>
             <div className="text-sm font-medium">
               {format(new Date(clockIn), "h:mm a")}
             </div>
           </div>
+
+          {showBreakInfo && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Break Time</div>
+              <div className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                {formatBreakTime(breakSeconds)}
+              </div>
+            </div>
+          )}
 
           <div>
             <div className="text-xs text-muted-foreground mb-1">Clock Out</div>
@@ -162,6 +174,23 @@ const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAd
             <div className="text-xs text-muted-foreground mb-1">Hours</div>
             <div className="text-sm font-semibold text-primary">
               {hoursWorked ? formatHoursToReadable(hoursWorked) : "—"}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBreakInfo && (
+        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Status</div>
+            <div className="text-xs font-medium">
+              {pausedAt ? (
+                <span className="text-orange-600 dark:text-orange-400">
+                  On Break (Started: {format(new Date(pausedAt), "h:mm a")})
+                </span>
+              ) : (
+                <span className="text-green-600 dark:text-green-400">Active</span>
+              )}
             </div>
           </div>
         </div>

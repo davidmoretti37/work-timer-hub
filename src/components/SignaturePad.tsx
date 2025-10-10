@@ -53,19 +53,19 @@ const SignaturePad = forwardRef<SignaturePadRef, SignaturePadProps>(
 
     return (
       <div className="flex flex-col gap-2">
-        <div className="border border-gray-300 rounded-lg p-2 bg-white">
+        <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
           <SignatureCanvas
             ref={signaturePadRef}
             canvasProps={{
               width: width,
               height: height,
-              className: "rounded border bg-white",
+              className: "rounded border bg-white dark:bg-gray-800",
               style: { width: `${width}px`, height: `${height}px` }
             }}
             backgroundColor="rgb(255, 255, 255)"
             penColor="rgb(0, 0, 0)"
-            minWidth={0.8}
-            maxWidth={2.5}
+            minWidth={0.5}
+            maxWidth={3.0}
             velocityFilterWeight={0.7}
             onEnd={handleSignatureEnd}
           />

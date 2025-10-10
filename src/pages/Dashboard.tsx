@@ -9,6 +9,7 @@ import Navbar from "@/components/Navbar";
 import StatusBadge from "@/components/StatusBadge";
 import TimeDisplay from "@/components/TimeDisplay";
 import { Clock, PlayCircle, StopCircle, Users, Trash2, UserX, Edit2, Save, X, PauseCircle, Play } from "lucide-react";
+import { formatBreakTime } from "@/utils/timeUtils";
 
 const Dashboard = () => {
   const [user, setUser] = useState<any>(null);
@@ -122,7 +123,26 @@ const Dashboard = () => {
       .order("created_at", { ascending: false });
     
     if (data) {
-      setAllUsers(data);
+      // Fetch active sessions for each user
+      const usersWithSessions = await Promise.all(
+        data.map(async (userProfile) => {
+          const { data: activeSession } = await supabase
+            .from("time_sessions")
+            .select("*")
+            .eq("user_id", userProfile.id)
+            .is("clock_out", null)
+            .order("clock_in", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          return {
+            ...userProfile,
+            activeSession
+          };
+        })
+      );
+      
+      setAllUsers(usersWithSessions);
     }
   };
 
@@ -457,6 +477,26 @@ const Dashboard = () => {
                                     {userRole === 'admin' ? '👑 Admin' : '👤 User'} • 
                                     Joined {new Date(userProfile.created_at).toLocaleDateString()}
                                   </p>
+                                  {userProfile.activeSession && (
+                                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border">
+                                      <div className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">
+                                        Current Session
+                                      </div>
+                                      <div className="text-xs text-blue-600 dark:text-blue-400">
+                                        Clock In: {new Date(userProfile.activeSession.clock_in).toLocaleTimeString()}
+                                      </div>
+                                      {userProfile.activeSession.paused_at && (
+                                        <div className="text-xs text-orange-600 dark:text-orange-400">
+                                          On Lunch Break (Started: {new Date(userProfile.activeSession.paused_at).toLocaleTimeString()})
+                                        </div>
+                                      )}
+                                      {userProfile.activeSession.break_seconds > 0 && (
+                                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                                          Total Break Time: {formatBreakTime(userProfile.activeSession.break_seconds)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </>
                               )}
                             </div>

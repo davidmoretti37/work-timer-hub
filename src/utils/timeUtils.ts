@@ -41,3 +41,19 @@ export const formatHoursDetailed = (hours: number | null | undefined): string =>
     return `${h} hour${h !== 1 ? 's' : ''} ${m} minute${m !== 1 ? 's' : ''}`;
   }
 };
+
+export const formatBreakTime = (breakSeconds: number | null | undefined): string => {
+  if (!breakSeconds || breakSeconds === 0) return "0m";
+  
+  const totalMinutes = Math.floor(breakSeconds / 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  
+  if (h === 0) {
+    return `${m}m`;
+  } else if (m === 0) {
+    return `${h}h`;
+  } else {
+    return `${h}h ${m}m`;
+  }
+};

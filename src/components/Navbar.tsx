@@ -4,6 +4,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Clock, LogOut, History, LayoutDashboard, Users, Calendar, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dock, DockIcon, DockItem, DockLabel } from "@/components/ui/dock";
+import ThemeSwitch from "./ThemeSwitch";
 
 interface NavbarProps {
   isAdmin?: boolean;
@@ -36,10 +37,10 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-gray-100" style={{boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.3), 0 4px 8px -2px rgba(0, 0, 0, 0.15)'}}>
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-gray-100 dark:bg-black" style={{boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.3), 0 4px 8px -2px rgba(0, 0, 0, 0.15)'}}>
       <div className="container mx-auto px-4">
         <div className="flex h-24 items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2 font-semibold text-lg text-gray-900">
+          <Link to="/dashboard" className="flex items-center gap-2 font-semibold text-lg text-gray-900 dark:text-white">
             <Clock className="h-6 w-6 text-primary" />
             <span>TimeTrack</span>
           </Link>
@@ -50,7 +51,7 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
                 <DockItem>
                   <DockIcon>
                     <Link to="/dashboard" className="flex items-center justify-center w-full h-full">
-                      <LayoutDashboard className="h-4 w-4 text-gray-700 hover:text-primary transition-colors" />
+                      <LayoutDashboard className="h-4 w-4 text-gray-700 dark:text-white hover:text-primary transition-colors" />
                     </Link>
                   </DockIcon>
                   <DockLabel>Dashboard</DockLabel>
@@ -59,7 +60,7 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
                 <DockItem>
                   <DockIcon>
                     <Link to="/history" className="flex items-center justify-center w-full h-full">
-                      <History className="h-4 w-4 text-gray-700 hover:text-primary transition-colors" />
+                      <History className="h-4 w-4 text-gray-700 dark:text-white hover:text-primary transition-colors" />
                     </Link>
                   </DockIcon>
                   <DockLabel>History</DockLabel>
@@ -68,7 +69,7 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
                 <DockItem>
                   <DockIcon>
                     <Link to="/calendar" className="flex items-center justify-center w-full h-full">
-                      <Calendar className="h-4 w-4 text-gray-700 hover:text-primary transition-colors" />
+                      <Calendar className="h-4 w-4 text-gray-700 dark:text-white hover:text-primary transition-colors" />
                     </Link>
                   </DockIcon>
                   <DockLabel>Calendar</DockLabel>
@@ -77,7 +78,7 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
                 <DockItem>
                   <DockIcon>
                     <Link to="/pto" className="flex items-center justify-center w-full h-full">
-                      <FileText className="h-4 w-4 text-gray-700 hover:text-primary transition-colors" />
+                      <FileText className="h-4 w-4 text-gray-700 dark:text-white hover:text-primary transition-colors" />
                     </Link>
                   </DockIcon>
                   <DockLabel>PTO Request</DockLabel>
@@ -87,7 +88,7 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
                   <DockItem>
                     <DockIcon>
                       <Link to="/admin" className="flex items-center justify-center w-full h-full">
-                        <Users className="h-4 w-4 text-gray-700 hover:text-primary transition-colors" />
+                        <Users className="h-4 w-4 text-gray-700 dark:text-white hover:text-primary transition-colors" />
                       </Link>
                     </DockIcon>
                     <DockLabel>Admin</DockLabel>
@@ -97,7 +98,7 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
                 <DockItem>
                   <DockIcon>
                     <button onClick={handleLogout} className="flex items-center justify-center w-full h-full">
-                      <LogOut className="h-4 w-4 text-gray-700 hover:text-destructive transition-colors" />
+                      <LogOut className="h-4 w-4 text-gray-700 dark:text-white hover:text-destructive transition-colors" />
                     </button>
                   </DockIcon>
                   <DockLabel>Logout</DockLabel>
@@ -106,7 +107,9 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
             </div>
           </div>
 
-          <div className="w-20" />
+          <div className="flex items-center justify-end w-20">
+            <ThemeSwitch />
+          </div>
         </div>
       </div>
     </nav>

@@ -313,7 +313,7 @@ Click one of the links above to approve or reject this request.
                 <Input
                   value={format(formData.submissionDate, "PPP")}
                   readOnly
-                  className="bg-gray-50"
+                  className="bg-gray-50 dark:bg-gray-800 dark:text-white"
                 />
               </div>
             </div>
@@ -326,6 +326,7 @@ Click one of the links above to approve or reject this request.
                 value={formData.employeeName}
                 onChange={(e) => setFormData(prev => ({ ...prev, employeeName: e.target.value }))}
                 placeholder="Enter your full name"
+                className="dark:bg-gray-800 dark:text-white dark:border-gray-600"
               />
             </div>
 
@@ -343,6 +344,7 @@ Click one of the links above to approve or reject this request.
                 value={formData.confirmationEmail}
                 onChange={(e) => setFormData(prev => ({ ...prev, confirmationEmail: e.target.value }))}
                 placeholder="Enter email for confirmation notifications"
+                className="dark:bg-gray-800 dark:text-white dark:border-gray-600"
               />
             </div>
 
@@ -376,7 +378,7 @@ Click one of the links above to approve or reject this request.
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal",
+                        "w-full justify-start text-left font-normal dark:bg-gray-800 dark:text-white dark:border-gray-600",
                         !formData.startDate && "text-muted-foreground"
                       )}
                     >
@@ -402,7 +404,7 @@ Click one of the links above to approve or reject this request.
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal",
+                        "w-full justify-start text-left font-normal dark:bg-gray-800 dark:text-white dark:border-gray-600",
                         !formData.endDate && "text-muted-foreground"
                       )}
                     >
@@ -457,14 +459,14 @@ Click one of the links above to approve or reject this request.
                   value={formData.customReason}
                   onChange={(e) => setFormData(prev => ({ ...prev, customReason: e.target.value }))}
                   placeholder="Please provide any additional details about your request..."
-                  className="mt-1"
+                  className="mt-1 dark:bg-gray-800 dark:text-white dark:border-gray-600"
                 />
               </div>
             </div>
 
             {/* Agreement */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="font-semibold text-sm">
+            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+              <p className="font-semibold text-sm dark:text-white">
                 I understand that this request is subject to approval by my employer.
               </p>
             </div>
@@ -472,10 +474,10 @@ Click one of the links above to approve or reject this request.
             {/* Employee Signature */}
             <div>
               <Label className="text-base font-semibold">Employee's Signature</Label>
-              <div className="mt-2">
+              <div className="mt-2 flex justify-center">
                 <SignaturePad
                   ref={signaturePadRef}
-                  width={400}
+                  width={500}
                   height={150}
                   onSignatureChange={handleSignatureChange}
                 />
