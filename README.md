@@ -1,73 +1,159 @@
-# Welcome to your Lovable project
+# Work Timer Hub
 
-## Project info
+A comprehensive time tracking and PTO (Paid Time Off) management application built with React, TypeScript, and Supabase.
 
-**URL**: https://lovable.dev/projects/ef6caf19-a489-4be4-937b-664f0d0668b0
+## Project Structure
 
-## How can I edit this code?
+This project is organized as a monorepo with clear separation between frontend and backend components:
 
-There are several ways of editing your application.
+```
+work-timer-hub/
+├── frontend/                 # React/Vite frontend application
+│   ├── src/                 # Source code
+│   │   ├── components/      # React components
+│   │   ├── pages/          # Page components
+│   │   ├── hooks/          # Custom React hooks
+│   │   ├── lib/            # Utility libraries
+│   │   ├── integrations/   # External service integrations
+│   │   └── utils/          # Utility functions
+│   ├── public/             # Static assets
+│   ├── dist/               # Build output
+│   ├── package.json        # Frontend dependencies
+│   ├── vite.config.ts      # Vite configuration
+│   ├── tailwind.config.ts  # Tailwind CSS configuration
+│   └── tsconfig.json       # TypeScript configuration
+├── backend/                 # Supabase backend services
+│   ├── supabase/           # Supabase project files
+│   │   ├── functions/      # Edge functions
+│   │   ├── migrations/     # Database migrations
+│   │   └── config.toml     # Supabase configuration
+│   ├── infra/              # Infrastructure configuration
+│   └── package.json        # Backend dependencies
+├── package.json            # Root package.json (monorepo management)
+└── README.md              # This file
+```
 
-**Use Lovable**
+## Features
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/ef6caf19-a489-4be4-937b-664f0d0668b0) and start prompting.
+- **Time Tracking**: Track work sessions with start/stop functionality
+- **PTO Management**: Request and manage paid time off
+- **Admin Dashboard**: Approve PTO requests and manage users
+- **Calendar Integration**: View time tracking and PTO on calendar
+- **Email Notifications**: Automated email confirmations and notifications
+- **Responsive Design**: Mobile-friendly interface with dark/light themes
 
-Changes made via Lovable will be committed automatically to this repo.
+## Technology Stack
 
-**Use your preferred IDE**
+### Frontend
+- **React 18** with TypeScript
+- **Vite** for build tooling
+- **Tailwind CSS** for styling
+- **Radix UI** for accessible components
+- **React Router** for navigation
+- **React Hook Form** for form management
+- **Framer Motion** for animations
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Backend
+- **Supabase** for backend-as-a-service
+- **PostgreSQL** database
+- **Edge Functions** for serverless functions
+- **Row Level Security** for data protection
+- **Email integration** via Resend
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Getting Started
 
-Follow these steps:
+### Prerequisites
+- Node.js 18+ 
+- npm 8+
+- Supabase CLI (for backend development)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Installation
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd work-timer-hub
+   ```
 
-# Step 3: Install the necessary dependencies.
-npm i
+2. **Install all dependencies**
+   ```bash
+   npm run install:all
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+3. **Set up environment variables**
+   - Copy `.env.example` to `.env.local` in the frontend directory
+   - Add your Supabase URL and anon key
+
+4. **Start development servers**
+   ```bash
+   npm run dev
+   ```
+
+This will start both the frontend (Vite dev server) and backend (Supabase local development) simultaneously.
+
+### Individual Development
+
+**Frontend only:**
+```bash
+cd frontend
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+**Backend only:**
+```bash
+cd backend
+npm run dev
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Available Scripts
 
-**Use GitHub Codespaces**
+### Root Level
+- `npm run dev` - Start both frontend and backend in development mode
+- `npm run build` - Build both frontend and backend for production
+- `npm run install:all` - Install dependencies for all workspaces
+- `npm run clean` - Clean all node_modules and build artifacts
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Frontend
+- `npm run dev:frontend` - Start Vite development server
+- `npm run build:frontend` - Build for production
+- `npm run preview:frontend` - Preview production build
+- `npm run lint` - Run ESLint
 
-## What technologies are used for this project?
+### Backend
+- `npm run dev:backend` - Start Supabase local development
+- `npm run deploy:backend` - Deploy Supabase functions
+- `npm run migrate:backend` - Run database migrations
 
-This project is built with:
+## Deployment
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Frontend
+The frontend can be deployed to any static hosting service:
+- Vercel (recommended)
+- Netlify
+- GitHub Pages
 
-## How can I deploy this project?
+### Backend
+The backend uses Supabase, which handles:
+- Database hosting
+- Edge function deployment
+- Authentication
+- Real-time subscriptions
 
-Simply open [Lovable](https://lovable.dev/projects/ef6caf19-a489-4be4-937b-664f0d0668b0) and click on Share -> Publish.
+## Development Workflow
 
-## Can I connect a custom domain to my Lovable project?
+1. **Database Changes**: Create migrations in `backend/supabase/migrations/`
+2. **API Functions**: Add edge functions in `backend/supabase/functions/`
+3. **Frontend Features**: Develop components in `frontend/src/`
+4. **Testing**: Run tests and linting before committing
 
-Yes, you can!
+## Contributing
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## License
+
+This project is private and proprietary.

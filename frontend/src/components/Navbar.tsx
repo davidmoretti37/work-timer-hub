@@ -37,10 +37,10 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-gray-100 dark:bg-black" style={{boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.3), 0 4px 8px -2px rgba(0, 0, 0, 0.15)'}}>
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b-2 bg-gray-100 dark:bg-neutral-800" style={{boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.3), 0 4px 8px -2px rgba(0, 0, 0, 0.15)', borderBottomColor: 'hsl(90 15% 50%)'}}>
       <div className="container mx-auto px-4">
         <div className="flex h-24 items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-2 font-semibold text-lg text-gray-900 dark:text-white">
+          <Link to="/dashboard" className="flex items-center gap-2 font-semibold text-lg" style={{color: 'hsl(90 15% 50%)'}}>
             <Clock className="h-6 w-6 text-primary" />
             <span>TimeTrack</span>
           </Link>

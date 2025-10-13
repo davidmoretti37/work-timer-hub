@@ -92,7 +92,7 @@ function Dock({
           mouseX.set(Infinity);
         }}
         className={cn(
-          'flex w-fit gap-2 rounded-xl bg-gray-50 px-3 py-1.5 dark:bg-gray-800 shadow-lg',
+          'flex w-fit gap-2 rounded-xl bg-gray-50 px-3 py-1.5 dark:bg-neutral-700 shadow-lg border-2 nav-green-border',
           className
         )}
         style={{ height: panelHeight }}

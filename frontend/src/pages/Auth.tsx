@@ -143,7 +143,7 @@ const Auth = () => {
     <div className="min-h-screen relative flex items-center justify-center p-4">
       <div className="absolute inset-0 -z-10">
         <LiquidEther
-          colors={["#121212", "#1f1f1f", "#161616"]}
+          colors={["#1a1a1a", "#2a2a2a", "#1f1f1f"]}
           autoDemo={true}
           autoSpeed={0.4}
           autoIntensity={2.0}
