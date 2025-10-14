@@ -14,22 +14,27 @@ interface SessionCardProps {
   userName?: string;
   sessionId?: string;
   isAdmin?: boolean;
-  onUpdate?: (sessionId: string, clockIn: string, clockOut: string | null) => void;
+  onUpdate?: (sessionId: string, clockIn: string, clockOut: string | null, breakStart?: string | null, breakEnd?: string | null) => void;
   onDelete?: (sessionId: string) => void;
   pausedAt?: string | null;
   breakSeconds?: number | null;
+  breakEnd?: string | null;
 }
 
-const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAdmin, onUpdate, onDelete, pausedAt, breakSeconds }: SessionCardProps) => {
+const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAdmin, onUpdate, onDelete, pausedAt, breakSeconds, breakEnd }: SessionCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const showBreakInfo = pausedAt || (breakSeconds && breakSeconds > 0);
   const [editClockIn, setEditClockIn] = useState('');
   const [editClockOut, setEditClockOut] = useState('');
+  const [editBreakStart, setEditBreakStart] = useState('');
+  const [editBreakEnd, setEditBreakEnd] = useState('');
   const isActive = !clockOut;
 
   const handleStartEdit = () => {
     setEditClockIn(format(new Date(clockIn), "yyyy-MM-dd'T'HH:mm"));
     setEditClockOut(clockOut ? format(new Date(clockOut), "yyyy-MM-dd'T'HH:mm") : '');
+    setEditBreakStart(pausedAt ? format(new Date(pausedAt), "yyyy-MM-dd'T'HH:mm") : '');
+    setEditBreakEnd(breakEnd ? format(new Date(breakEnd), "yyyy-MM-dd'T'HH:mm") : '');
     setIsEditing(true);
   };
 
@@ -37,7 +42,9 @@ const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAd
     if (!sessionId || !onUpdate) return;
     
     const newClockOut = editClockOut ? new Date(editClockOut).toISOString() : null;
-    onUpdate(sessionId, new Date(editClockIn).toISOString(), newClockOut);
+    const newBreakStart = editBreakStart ? new Date(editBreakStart).toISOString() : null;
+    const newBreakEnd = editBreakEnd ? new Date(editBreakEnd).toISOString() : null;
+    onUpdate(sessionId, new Date(editClockIn).toISOString(), newClockOut, newBreakStart, newBreakEnd);
     setIsEditing(false);
   };
 
@@ -116,32 +123,58 @@ const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAd
       )}
 
       {isEditing ? (
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <div className="text-xs text-muted-foreground mb-1">Clock In</div>
-            <Input
-              type="datetime-local"
-              value={editClockIn}
-              onChange={(e) => setEditClockIn(e.target.value)}
-              className="text-sm"
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Clock In</div>
+              <Input
+                type="datetime-local"
+                value={editClockIn}
+                onChange={(e) => setEditClockIn(e.target.value)}
+                className="text-sm"
+              />
+            </div>
+
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Clock Out</div>
+              <Input
+                type="datetime-local"
+                value={editClockOut}
+                onChange={(e) => setEditClockOut(e.target.value)}
+                className="text-sm"
+                disabled={isActive}
+              />
+            </div>
+
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Hours</div>
+              <div className="text-sm font-semibold text-primary flex items-center h-9">
+                {hoursWorked ? formatHoursToReadable(hoursWorked) : "—"}
+              </div>
+            </div>
           </div>
 
-          <div>
-            <div className="text-xs text-muted-foreground mb-1">Clock Out</div>
-            <Input
-              type="datetime-local"
-              value={editClockOut}
-              onChange={(e) => setEditClockOut(e.target.value)}
-              className="text-sm"
-              disabled={isActive}
-            />
-          </div>
+          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-gray-200 dark:border-gray-700">
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Break Start</div>
+              <Input
+                type="datetime-local"
+                value={editBreakStart}
+                onChange={(e) => setEditBreakStart(e.target.value)}
+                className="text-sm"
+                placeholder="No break"
+              />
+            </div>
 
-          <div>
-            <div className="text-xs text-muted-foreground mb-1">Hours</div>
-            <div className="text-sm font-semibold text-primary flex items-center h-9">
-              {hoursWorked ? formatHoursToReadable(hoursWorked) : "—"}
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Break End</div>
+              <Input
+                type="datetime-local"
+                value={editBreakEnd}
+                onChange={(e) => setEditBreakEnd(e.target.value)}
+                className="text-sm"
+                placeholder="No break"
+              />
             </div>
           </div>
         </div>

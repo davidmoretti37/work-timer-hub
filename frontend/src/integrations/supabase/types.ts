@@ -139,6 +139,7 @@ export type Database = {
           created_at: string
           paused_at: string | null
           break_seconds: number
+          break_end: string | null
           hours_worked: number | null
           id: string
           user_id: string
@@ -149,6 +150,7 @@ export type Database = {
           created_at?: string
           paused_at?: string | null
           break_seconds?: number
+          break_end?: string | null
           hours_worked?: number | null
           id?: string
           user_id: string
@@ -159,6 +161,7 @@ export type Database = {
           created_at?: string
           paused_at?: string | null
           break_seconds?: number
+          break_end?: string | null
           hours_worked?: number | null
           id?: string
           user_id?: string

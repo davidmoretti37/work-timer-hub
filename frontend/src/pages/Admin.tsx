@@ -72,7 +72,7 @@ const Admin = () => {
   const fetchAllSessions = async () => {
     const { data: sessionsData } = await supabase
       .from("time_sessions")
-      .select("*")
+      .select("*, break_end")
       .order("clock_in", { ascending: false });
     
     if (sessionsData) {
@@ -282,21 +282,31 @@ const Admin = () => {
     setUserFilters(newFilters);
   };
 
-  const handleUpdateSession = async (sessionId: string, clockIn: string, clockOut: string | null) => {
+  const handleUpdateSession = async (sessionId: string, clockIn: string, clockOut: string | null, breakStart?: string | null, breakEnd?: string | null) => {
     try {
+      const updateData: any = {
+        clock_in: clockIn,
+        clock_out: clockOut,
+      };
+
+      // Update break start and end times if provided
+      if (breakStart !== undefined) {
+        updateData.paused_at = breakStart;
+      }
+      if (breakEnd !== undefined) {
+        updateData.break_end = breakEnd;
+      }
+
       const { error } = await supabase
         .from("time_sessions")
-        .update({
-          clock_in: clockIn,
-          clock_out: clockOut,
-        })
+        .update(updateData)
         .eq("id", sessionId);
 
       if (error) throw error;
 
       toast({
         title: "Session updated",
-        description: "Session times have been updated and hours recalculated.",
+        description: "Session times and break periods have been updated and hours recalculated.",
       });
 
       // Refresh sessions to get updated hours_worked
@@ -630,6 +640,7 @@ const Admin = () => {
                   onDelete={handleDeleteSession}
                   pausedAt={session.paused_at}
                   breakSeconds={session.break_seconds}
+                  breakEnd={session.break_end}
                 />
               ))}
             </TabsContent>
@@ -761,6 +772,7 @@ const Admin = () => {
                               onDelete={handleDeleteSession}
                               pausedAt={session.paused_at}
                               breakSeconds={session.break_seconds}
+                              breakEnd={session.break_end}
                             />
                           ));
                         }
@@ -792,6 +804,7 @@ const Admin = () => {
                                     onDelete={handleDeleteSession}
                                     pausedAt={session.paused_at}
                                     breakSeconds={session.break_seconds}
+                                    breakEnd={session.break_end}
                                   />
                                 ))}
                               </div>
