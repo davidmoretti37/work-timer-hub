@@ -217,6 +217,12 @@ serve(async (req) => {
       const payload = await req.json().catch(() => ({}));
 
       async function upsertAndClockIn(single: any): Promise<boolean> {
+        // If status is provided, only process successful logins
+        const statusVal: string | undefined = (single?.status ?? single?.Status);
+        if (typeof statusVal === "string" && statusVal.toLowerCase() !== "success") {
+          return false; // skip failed/other statuses
+        }
+
         const salesforceId: string | undefined = single?.salesforce_id || single?.user_id;
         const email: string | undefined = single?.email;
         const name: string | undefined = single?.name;
