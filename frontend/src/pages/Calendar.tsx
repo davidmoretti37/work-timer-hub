@@ -58,12 +58,12 @@ const Calendar = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Separate useEffect for fetching PTO requests that depends on user and isAdmin
+  // Fetch PTO requests once the user session is ready
   useEffect(() => {
     if (user) {
       fetchPTORequests();
     }
-  }, [user, isAdmin]); // This will refetch when user or isAdmin changes
+  }, [user]);
 
   // Realtime updates: listen for PTO request changes and refresh when approved
   useEffect(() => {
@@ -80,10 +80,7 @@ const Calendar = () => {
         const wasDeleted = payload.eventType === 'DELETE';
 
         if (becameApproved || wasDeleted) {
-          // Only update if current user should see it (non-admin sees only their own)
-          if (isAdmin || newRow?.user_id === user.id) {
-            fetchPTORequests();
-          }
+          fetchPTORequests();
         }
       })
       .subscribe();
@@ -91,14 +88,14 @@ const Calendar = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, isAdmin]);
+  }, [user]);
 
   // Fetch all events for the currently visible month (for grid rendering)
   useEffect(() => {
     if (user) {
       fetchMonthEvents();
     }
-  }, [currentDate, user, isAdmin]);
+  }, [currentDate, user]);
 
   const fetchProfile = async (userId: string) => {
     const { data } = await supabase
@@ -132,22 +129,12 @@ const Calendar = () => {
 
   const fetchPTORequests = async () => {
     try {
-      console.log("🔄 Fetching PTO requests... isAdmin:", isAdmin, "user:", user?.id);
+      console.log("🔄 Fetching PTO requests... user:", user?.id);
       
-      let query = supabase
+      const { data, error } = await supabase
         .from("pto_requests")
         .select("*")
         .eq("status", "approved");
-
-      // If not admin, only fetch current user's PTO
-      if (!isAdmin && user) {
-        query = query.eq("user_id", user.id);
-        console.log("📋 Fetching PTO for user:", user.id, "(non-admin)");
-      } else {
-        console.log("📋 Fetching PTO for all users (admin or no user filter)");
-      }
-
-      const { data, error } = await query;
       
       if (error) throw error;
       
@@ -185,17 +172,11 @@ const Calendar = () => {
       const startIso = new Date(Date.UTC(rangeStart.getFullYear(), rangeStart.getMonth(), rangeStart.getDate())).toISOString().slice(0,10);
       const endIso = new Date(Date.UTC(rangeEnd.getFullYear(), rangeEnd.getMonth(), rangeEnd.getDate())).toISOString().slice(0,10);
 
-      let query = supabase
+      const { data, error } = await supabase
         .from("calendar_events")
         .select("*")
         .gte("event_date", startIso)
         .lte("event_date", endIso);
-
-      if (!isAdmin && user) {
-        query = query.eq("user_id", user.id);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
 
       const map: Record<string, any[]> = {};
@@ -213,16 +194,10 @@ const Calendar = () => {
   const fetchEventsForDate = async (date: Date) => {
     try {
       const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString().slice(0,10);
-      let query = supabase
+      const { data, error } = await supabase
         .from("calendar_events")
         .select("*")
         .eq("event_date", iso);
-
-      if (!isAdmin && user) {
-        query = query.eq("user_id", user.id);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
       setEvents(data || []);
     } catch (e) {
@@ -529,7 +504,7 @@ const Calendar = () => {
 
           {/* Custom Events list */}
           <div className="mt-4 space-y-2">
-            <h4 className="font-semibold">Your Events</h4>
+            <h4 className="font-semibold">Events</h4>
             {events.length === 0 && (
               <div className="text-sm text-muted-foreground">No events for this date.</div>
             )}
@@ -553,11 +528,18 @@ const Calendar = () => {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => deleteEvent(evt.id)} className="border-destructive text-destructive">
-                      Delete
-                    </Button>
-                  </div>
+                  {(isAdmin || evt.user_id === user?.id) && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteEvent(evt.id)}
+                        className="border-destructive text-destructive"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
