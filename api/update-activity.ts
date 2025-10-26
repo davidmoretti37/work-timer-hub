@@ -1,26 +1,15 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing Supabase environment variables');
+}
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-type SuccessResponse = {
-  success: true;
-  message: string;
-  employee_id: string;
-  employee_name: string | null;
-};
-
-type ErrorResponse = {
-  success: false;
-  error: string;
-};
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<SuccessResponse | ErrorResponse>
-) {
+export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -34,13 +23,13 @@ export default async function handler(
   }
 
   try {
-    const { email, status } = req.body as { email?: string; status?: string };
+    const { email, status } = req.body ?? {};
 
     if (!email || !status) {
       return res.status(400).json({ success: false, error: 'Missing email or status' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = String(email).toLowerCase().trim();
     const timestamp = new Date().toISOString();
 
     const { data: employee, error: empError } = await supabase
@@ -84,7 +73,7 @@ export default async function handler(
       employee_name: employee.name ?? null,
     });
   } catch (error: any) {
-    console.error('Error:', error);
+    console.error('Error updating activity:', error);
     return res.status(500).json({ success: false, error: 'Server error' });
   }
 }
