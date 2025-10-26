@@ -15,6 +15,7 @@ const Dashboard = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -34,8 +35,9 @@ const Dashboard = () => {
 
       setUser(session.user);
       await fetchProfile(session.user.id);
+      const currentEmployeeId = await fetchEmployeeId(session.user.email);
       const adminStatus = await checkAdminStatus(session.user.id);
-      await fetchActiveSession(session.user.id);
+      await fetchActiveSession(session.user.id, currentEmployeeId);
       
       if (adminStatus) {
         await fetchAllUsers();
@@ -50,8 +52,10 @@ const Dashboard = () => {
       } else {
         setUser(session.user);
         fetchProfile(session.user.id);
+        fetchEmployeeId(session.user.email).then((id) => {
+          fetchActiveSession(session.user.id, id);
+        });
         checkAdminStatus(session.user.id);
-        fetchActiveSession(session.user.id);
       }
     });
 
@@ -84,6 +88,31 @@ const Dashboard = () => {
     setProfile(data);
   };
 
+  const fetchEmployeeId = async (userEmail?: string | null) => {
+    if (!userEmail) {
+      setEmployeeId(null);
+      return null;
+    }
+
+    const normalizedEmail = userEmail.toLowerCase().trim();
+
+    const { data, error } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching employee record:", error);
+      setEmployeeId(null);
+      return null;
+    }
+
+    const id = data?.id ?? null;
+    setEmployeeId(id);
+    return id;
+  };
+
   const checkAdminStatus = async (userId: string) => {
     const { data } = await supabase
       .from("user_roles")
@@ -97,8 +126,35 @@ const Dashboard = () => {
     return isAdminUser;
   };
 
-  const fetchActiveSession = async (userId: string) => {
-    const { data } = await supabase
+  const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
+    if (currentEmployeeId) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const { data: clockInRecord, error: clockInError } = await supabase
+        .from("clock_in_records")
+        .select("*")
+        .eq("employee_id", currentEmployeeId)
+        .eq("status", "clocked_in")
+        .gte("clock_in_time", today.toISOString())
+        .lt("clock_in_time", tomorrow.toISOString())
+        .order("clock_in_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (clockInError) {
+        console.error("Error fetching clock-in records:", clockInError);
+      }
+
+      if (clockInRecord) {
+        setActiveSession({ ...clockInRecord, source: "clock_in_records" });
+        return;
+      }
+    }
+
+    const { data: timeSession, error: timeSessionError } = await supabase
       .from("time_sessions")
       .select("*")
       .eq("user_id", userId)
@@ -106,8 +162,12 @@ const Dashboard = () => {
       .order("clock_in", { ascending: false })
       .limit(1)
       .maybeSingle();
-    
-    setActiveSession(data);
+
+    if (timeSessionError) {
+      console.error("Error fetching time session:", timeSessionError);
+    }
+
+    setActiveSession(timeSession ? { ...timeSession, source: "time_sessions" } : null);
   };
 
   const fetchAllUsers = async () => {
@@ -243,14 +303,21 @@ const Dashboard = () => {
         title: "Clocked In",
         description: "Your work session has started",
       });
-      await fetchActiveSession(user.id);
+      await fetchActiveSession(user.id, employeeId);
     }
     setLoading(false);
   };
 
   const handleClockOut = async () => {
     if (!user || !activeSession) return;
-    
+    if (activeSession.source !== "time_sessions") {
+      toast({
+        title: "Clock out unavailable",
+        description: "This clock-in is managed externally.",
+      });
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase
       .from("time_sessions")
@@ -270,13 +337,17 @@ const Dashboard = () => {
         title: "Clocked Out",
         description: "Your work session has ended",
       });
-      setActiveSession(null);
+      await fetchActiveSession(user.id, employeeId);
     }
     setLoading(false);
   };
 
   const handlePause = async () => {
     if (!user || !activeSession || activeSession.paused_at) return;
+    if (activeSession.source !== "time_sessions") {
+      toast({ title: "Pause unavailable", description: "This clock-in is managed externally.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     const { error } = await supabase
       .from("time_sessions")
@@ -285,13 +356,17 @@ const Dashboard = () => {
     if (error) {
       toast({ title: "Error", description: "Failed to start lunch break", variant: "destructive" });
     } else {
-      await fetchActiveSession(user.id);
+      await fetchActiveSession(user.id, employeeId);
     }
     setLoading(false);
   };
 
   const handleResume = async () => {
     if (!user || !activeSession || !activeSession.paused_at) return;
+    if (activeSession.source !== "time_sessions") {
+      toast({ title: "Resume unavailable", description: "This clock-in is managed externally.", variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
       const pausedAt = new Date(activeSession.paused_at);
@@ -304,13 +379,19 @@ const Dashboard = () => {
       if (error) {
         throw error;
       }
-      await fetchActiveSession(user.id);
+      await fetchActiveSession(user.id, employeeId);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to resume from break", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
+
+  const isTimeSession = activeSession?.source === "time_sessions";
+  const clockInTimestamp = activeSession
+    ? (isTimeSession ? activeSession.clock_in : activeSession.clock_in_time)
+    : null;
+  const isPaused = isTimeSession && !!activeSession?.paused_at;
 
   if (!user || !profile) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -337,45 +418,55 @@ const Dashboard = () => {
                   </CardTitle>
                   <CardDescription>Your active work session</CardDescription>
                 </div>
-                <StatusBadge isClockedIn={!!activeSession} isPaused={!!activeSession?.paused_at} />
+                <StatusBadge isClockedIn={!!activeSession} isPaused={isPaused} />
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {activeSession ? (
                 <>
-                  <TimeDisplay time={activeSession.clock_in} label="Clocked in at" />
-                  <Button
-                    onClick={handleClockOut}
-                    disabled={loading}
-                    variant="destructive"
-                    size="lg"
-                    className="w-full"
-                  >
-                    <StopCircle className="mr-2 h-5 w-5" />
-                    Clock Out
-                  </Button>
-                  {activeSession.paused_at ? (
-                    <Button
-                      onClick={handleResume}
-                      disabled={loading}
-                      variant="secondary"
-                      size="lg"
-                      className="w-full"
-                    >
-                      <Play className="mr-2 h-5 w-5" />
-                      Resume from Lunch Break
-                    </Button>
+                  {clockInTimestamp && (
+                    <TimeDisplay time={clockInTimestamp} label="Clocked in at" />
+                  )}
+                  {isTimeSession ? (
+                    <>
+                      <Button
+                        onClick={handleClockOut}
+                        disabled={loading}
+                        variant="destructive"
+                        size="lg"
+                        className="w-full"
+                      >
+                        <StopCircle className="mr-2 h-5 w-5" />
+                        Clock Out
+                      </Button>
+                      {activeSession.paused_at ? (
+                        <Button
+                          onClick={handleResume}
+                          disabled={loading}
+                          variant="secondary"
+                          size="lg"
+                          className="w-full"
+                        >
+                          <Play className="mr-2 h-5 w-5" />
+                          Resume from Lunch Break
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handlePause}
+                          disabled={loading}
+                          variant="outline"
+                          size="lg"
+                          className="w-full"
+                        >
+                          <PauseCircle className="mr-2 h-5 w-5" />
+                          Pause for Lunch Break
+                        </Button>
+                      )}
+                    </>
                   ) : (
-                    <Button
-                      onClick={handlePause}
-                      disabled={loading}
-                      variant="outline"
-                      size="lg"
-                      className="w-full"
-                    >
-                      <PauseCircle className="mr-2 h-5 w-5" />
-                      Pause for Lunch Break
-                    </Button>
+                    <p className="text-muted-foreground">
+                      Clock-in recorded via Salesforce integration. Clock out from Salesforce to update your status.
+                    </p>
                   )}
                 </>
               ) : (
