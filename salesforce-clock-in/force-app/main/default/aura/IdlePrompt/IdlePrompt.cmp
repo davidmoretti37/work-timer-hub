@@ -1,0 +1,11 @@
+<aura:component>
+    <aura:attribute name="countdownLabel" type="String" default="10:00" />
+    <aura:attribute name="onConfirm" type="Aura.Action" />
+
+    <div class="slds-p-around_medium slds-text-align_center">
+        <p class="slds-text-heading_medium slds-m-bottom_small">Are you still working?</p>
+        <p class="slds-text-body_regular slds-m-bottom_medium">We will mark you idle in {!v.countdownLabel} if you do not respond.</p>
+        <lightning:button variant="brand" label="Yes, I'm working" onclick="{!v.onConfirm}" />
+    </div>
+</aura:component>
+

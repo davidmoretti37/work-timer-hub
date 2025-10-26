@@ -81,7 +81,7 @@ const Navbar = ({ isAdmin }: NavbarProps) => {
                       <FileText className="h-4 w-4 text-gray-700 dark:text-white hover:text-primary transition-colors" />
                     </Link>
                   </DockIcon>
-                  <DockLabel>PTO Request</DockLabel>
+                  <DockLabel>Forms</DockLabel>
                 </DockItem>
 
                 {isAdmin && (

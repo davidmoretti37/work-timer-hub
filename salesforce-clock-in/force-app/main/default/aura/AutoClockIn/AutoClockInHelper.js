@@ -28,22 +28,31 @@
         var tracker = {
             userEmail: userEmail,
             lastInteraction: Date.now(),
-            currentStatus: null,
             lastSentStatus: null,
             lastSentAt: 0,
-            checkIntervalMs: 60000,
-            heartbeatMs: 4 * 60 * 1000,
-            activeThreshold: 3 * 60 * 1000,
-            awayThreshold: 10 * 60 * 1000,
+            activityFlag: true,
+            heartbeatMs: 5 * 60 * 1000,
+            idleThresholdMs: 30 * 60 * 1000,
+            idleTimeoutMs: 10 * 60 * 1000,
             listeners: [],
             intervalId: null,
             pending: false,
-            beforeUnloadHandler: null
+            beforeUnloadHandler: null,
+            idlePromptActive: false,
+            idlePromptDeadline: null,
+            idlePromptInterval: null,
+            idlePromptTimeout: null,
+            idlePromptBody: null,
+            idlePromptClose: null,
+            currentStatus: 'active'
         };
 
         var recordInteraction = function() {
             tracker.lastInteraction = Date.now();
-            helper.evaluateStatus(component, tracker, true);
+            tracker.activityFlag = true;
+            if (!tracker.idlePromptActive) {
+                helper.evaluateStatus(component, tracker, true);
+            }
         };
 
         var addListener = function(target, eventName, handler, options) {
@@ -57,16 +66,13 @@
         };
 
         addListener(window, 'mousemove', recordInteraction, true);
-        addListener(window, 'mousedown', recordInteraction, true);
+        addListener(window, 'click', recordInteraction, true);
         addListener(window, 'keydown', recordInteraction, true);
         addListener(window, 'touchstart', recordInteraction, true);
-        addListener(window, 'focus', recordInteraction, true);
 
         addListener(document, 'visibilitychange', function() {
             if (!document.hidden) {
                 recordInteraction();
-            } else {
-                helper.evaluateStatus(component, tracker, true);
             }
         });
 
@@ -77,43 +83,35 @@
 
         tracker.intervalId = window.setInterval(function() {
             helper.evaluateStatus(component, tracker, false);
-        }, tracker.checkIntervalMs);
+        }, 60000);
 
         window._workTimerHubTracker = tracker;
 
-        // Send initial active status immediately
-        tracker.currentStatus = 'active';
         helper.sendStatus(component, tracker, 'active', true);
     },
 
-    evaluateStatus: function(component, tracker, forceHeartbeat) {
+    evaluateStatus: function(component, tracker, triggeredByInteraction) {
         if (!tracker) {
             return;
         }
 
         var now = Date.now();
         var diff = now - tracker.lastInteraction;
-        var status;
 
-        if (document.hidden && diff > tracker.activeThreshold) {
-            status = diff > tracker.awayThreshold ? 'away' : 'idle';
-        } else if (diff <= tracker.activeThreshold) {
-            status = 'active';
-        } else if (diff <= tracker.awayThreshold) {
-            status = 'idle';
-        } else {
-            status = 'away';
+        if (tracker.idlePromptActive) {
+            this.updateIdleCountdown(component, tracker);
+            return;
         }
 
-        var statusChanged = status !== tracker.currentStatus;
+        if (diff >= tracker.idleThresholdMs) {
+            this.showIdlePrompt(component, tracker);
+            return;
+        }
+
         var heartbeatExpired = (now - tracker.lastSentAt) >= tracker.heartbeatMs;
-
-        if (statusChanged) {
-            tracker.currentStatus = status;
-        }
-
-        if (statusChanged || heartbeatExpired || forceHeartbeat) {
-            this.sendStatus(component, tracker, status, statusChanged || forceHeartbeat);
+        if (tracker.activityFlag || heartbeatExpired || triggeredByInteraction) {
+            tracker.currentStatus = 'active';
+            this.sendStatus(component, tracker, 'active', tracker.activityFlag || triggeredByInteraction);
         }
     },
 
@@ -124,6 +122,7 @@
 
         var now = Date.now();
         if (!force && tracker.lastSentStatus === status && (now - tracker.lastSentAt) < tracker.heartbeatMs) {
+            tracker.activityFlag = false;
             return;
         }
 
@@ -141,11 +140,149 @@
             if (response.getState() === "SUCCESS") {
                 tracker.lastSentStatus = status;
                 tracker.lastSentAt = Date.now();
+                tracker.activityFlag = false;
             } else {
                 console.error('updateActivity failed', response.getError());
             }
         });
         $A.enqueueAction(action);
+    },
+
+    showIdlePrompt: function(component, tracker) {
+        var helper = this;
+        tracker.idlePromptActive = true;
+        tracker.idlePromptDeadline = Date.now() + tracker.idleTimeoutMs;
+
+        $A.createComponent("c:IdlePrompt", {
+            countdownLabel: helper.formatCountdown(tracker.idleTimeoutMs),
+            onConfirm: component.getReference("c.handleIdleConfirm")
+        }, function(content, status) {
+            if (status === "SUCCESS") {
+                component.find("overlayLib").showCustomModal({
+                    header: "Are you still working?",
+                    body: content,
+                    showCloseButton: false,
+                    cssClass: "idle-prompt-modal"
+                }).then(function(overlay) {
+                    tracker.idlePromptBody = content;
+                    tracker.idlePromptClose = function() {
+                        overlay.close();
+                    };
+                    helper.startIdleCountdown(component, tracker);
+                });
+            } else {
+                tracker.idlePromptActive = false;
+            }
+        });
+    },
+
+    startIdleCountdown: function(component, tracker) {
+        var helper = this;
+        if (tracker.idlePromptInterval) {
+            window.clearInterval(tracker.idlePromptInterval);
+        }
+        if (tracker.idlePromptTimeout) {
+            window.clearTimeout(tracker.idlePromptTimeout);
+        }
+
+        tracker.idlePromptInterval = window.setInterval(function() {
+            helper.updateIdleCountdown(component, tracker);
+        }, 1000);
+
+        tracker.idlePromptTimeout = window.setTimeout(function() {
+            helper.handleIdleTimeout(component, tracker);
+        }, tracker.idleTimeoutMs);
+    },
+
+    updateIdleCountdown: function(component, tracker) {
+        if (!tracker || !tracker.idlePromptActive) {
+            return;
+        }
+
+        var remaining = tracker.idlePromptDeadline - Date.now();
+        if (remaining < 0) {
+            remaining = 0;
+        }
+
+        if (tracker.idlePromptBody) {
+            tracker.idlePromptBody.set("v.countdownLabel", this.formatCountdown(remaining));
+        }
+
+        if (remaining === 0) {
+            this.handleIdleTimeout(component, tracker);
+        }
+    },
+
+    handleIdleConfirm: function(component) {
+        var tracker = window._workTimerHubTracker;
+        if (!tracker) {
+            return;
+        }
+
+        this.confirmStillWorking(component, tracker);
+    },
+
+    confirmStillWorking: function(component, tracker) {
+        tracker.lastInteraction = Date.now();
+        tracker.activityFlag = true;
+        this.closeIdlePrompt(tracker);
+        this.sendStatus(component, tracker, 'active', true);
+    },
+
+    handleIdleTimeout: function(component, tracker) {
+        if (!tracker || !tracker.idlePromptActive) {
+            return;
+        }
+
+        this.closeIdlePrompt(tracker);
+        tracker.currentStatus = 'idle';
+        this.sendStatus(component, tracker, 'idle', true);
+        this.showToast(component, 'You have been marked as idle.', 'warning');
+    },
+
+    closeIdlePrompt: function(tracker) {
+        if (!tracker) {
+            return;
+        }
+
+        tracker.idlePromptActive = false;
+
+        if (tracker.idlePromptInterval) {
+            window.clearInterval(tracker.idlePromptInterval);
+            tracker.idlePromptInterval = null;
+        }
+
+        if (tracker.idlePromptTimeout) {
+            window.clearTimeout(tracker.idlePromptTimeout);
+            tracker.idlePromptTimeout = null;
+        }
+
+        if (tracker.idlePromptClose) {
+            try {
+                tracker.idlePromptClose();
+            } catch (e) {
+                // ignore overlay closing errors
+            }
+            tracker.idlePromptClose = null;
+        }
+
+        tracker.idlePromptBody = null;
+        tracker.idlePromptDeadline = null;
+    },
+
+    showToast: function(component, message, variant) {
+        try {
+            var notifLib = component.find("notifLib");
+            if (notifLib) {
+                notifLib.showToast({
+                    title: 'Activity Status',
+                    message: message,
+                    variant: variant || 'info'
+                });
+            }
+        } catch (error) {
+            console.error('Failed to show toast', error);
+        }
     },
 
     sendBeacon: function(tracker, status) {
@@ -201,7 +338,20 @@
             window.removeEventListener('beforeunload', tracker.beforeUnloadHandler);
         }
 
+        this.closeIdlePrompt(tracker);
+
         delete window._workTimerHubTracker;
+    },
+
+    formatCountdown: function(ms) {
+        var totalSeconds = Math.floor(ms / 1000);
+        var minutes = Math.floor(totalSeconds / 60);
+        var seconds = totalSeconds % 60;
+        return this.pad(minutes) + ':' + this.pad(seconds);
+    },
+
+    pad: function(value) {
+        return value < 10 ? '0' + value : '' + value;
     }
 })
 

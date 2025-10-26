@@ -132,6 +132,80 @@ export type Database = {
           },
         ]
       }
+      travel_requests: {
+        Row: {
+          id: string
+          user_id: string | null
+          employee_name: string
+          confirmation_email: string
+          travel_purpose: string
+          destination: string
+          departure_date: string
+          return_date: string
+          transportation_mode: string | null
+          transportation_details: string | null
+          lodging_required: boolean
+          lodging_details: string | null
+          estimated_cost: number | null
+          additional_notes: string | null
+          employee_signature: string
+          status: string
+          submission_date: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          employee_name: string
+          confirmation_email: string
+          travel_purpose: string
+          destination: string
+          departure_date: string
+          return_date: string
+          transportation_mode?: string | null
+          transportation_details?: string | null
+          lodging_required?: boolean
+          lodging_details?: string | null
+          estimated_cost?: number | null
+          additional_notes?: string | null
+          employee_signature: string
+          status?: string
+          submission_date?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          employee_name?: string
+          confirmation_email?: string
+          travel_purpose?: string
+          destination?: string
+          departure_date?: string
+          return_date?: string
+          transportation_mode?: string | null
+          transportation_details?: string | null
+          lodging_required?: boolean
+          lodging_details?: string | null
+          estimated_cost?: number | null
+          additional_notes?: string | null
+          employee_signature?: string
+          status?: string
+          submission_date?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "travel_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_sessions: {
         Row: {
           clock_in: string
