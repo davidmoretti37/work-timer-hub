@@ -125,6 +125,46 @@ const Dashboard = () => {
     return isAdminUser;
   };
 
+  const syncClockInRecordToTimeSession = async (userId: string, clockInRecord: any) => {
+    try {
+      const { data: existingSession, error: existingError } = await supabase
+        .from("time_sessions")
+        .select("*")
+        .eq("user_id", userId)
+        .is("clock_out", null)
+        .order("clock_in", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) {
+        console.error("Error checking existing session:", existingError);
+      }
+
+      if (existingSession) {
+        return { session: existingSession, clockInRecordId: clockInRecord?.id ?? null };
+      }
+
+      const { data: createdSession, error: createError } = await supabase
+        .from("time_sessions")
+        .insert({
+          user_id: userId,
+          clock_in: clockInRecord?.clock_in_time || new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error("Error creating session from clock-in record:", createError);
+        return null;
+      }
+
+      return { session: createdSession, clockInRecordId: clockInRecord?.id ?? null };
+    } catch (error) {
+      console.error("Failed to sync clock-in record:", error);
+      return null;
+    }
+  };
+
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
     if (currentEmployeeId) {
       const today = new Date();
@@ -148,6 +188,12 @@ const Dashboard = () => {
       }
 
       if (clockInRecord) {
+        const syncedSession = await syncClockInRecordToTimeSession(userId, clockInRecord);
+        if (syncedSession?.session) {
+          setActiveSession({ ...syncedSession.session, source: "time_sessions", clockInRecordId: syncedSession.clockInRecordId });
+          return;
+        }
+
         setActiveSession({ ...clockInRecord, source: "clock_in_records" });
         return;
       }
@@ -318,10 +364,11 @@ const Dashboard = () => {
     }
 
     setLoading(true);
+    const clockOutTime = new Date().toISOString();
     const { error } = await supabase
       .from("time_sessions")
       .update({
-        clock_out: new Date().toISOString(),
+        clock_out: clockOutTime,
       })
       .eq("id", activeSession.id);
 
@@ -332,6 +379,20 @@ const Dashboard = () => {
         variant: "destructive",
       });
     } else {
+      if (activeSession.clockInRecordId) {
+        const { error: clockInRecordError } = await supabase
+          .from("clock_in_records")
+          .update({
+            status: "clocked_out",
+            clock_out_time: clockOutTime,
+          })
+          .eq("id", activeSession.clockInRecordId);
+
+        if (clockInRecordError) {
+          console.error("Failed to update clock-in record status:", clockInRecordError);
+        }
+      }
+
       toast({
         title: "Clocked Out",
         description: "Your work session has ended",

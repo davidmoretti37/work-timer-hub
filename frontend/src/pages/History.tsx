@@ -113,6 +113,9 @@ const History = () => {
                   clockIn={session.clock_in}
                   clockOut={session.clock_out}
                   hoursWorked={session.hours_worked}
+                  pausedAt={session.paused_at}
+                  breakSeconds={session.break_seconds}
+                  breakEnd={session.break_end}
                 />
               ))
             )}
