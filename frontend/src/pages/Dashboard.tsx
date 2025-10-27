@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import StatusBadge from "@/components/StatusBadge";
-import TimeDisplay from "@/components/TimeDisplay";
 import { Clock, PlayCircle, StopCircle, Users, Trash2, UserX, Edit2, Save, X, PauseCircle, Play } from "lucide-react";
 import { formatBreakTime } from "@/utils/timeUtils";
 
@@ -391,6 +390,30 @@ const Dashboard = () => {
   const clockInTimestamp = activeSession
     ? (isTimeSession ? activeSession.clock_in : activeSession.clock_in_time)
     : null;
+
+  const formatClockIn = (timestamp?: string | null) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+
+    const timezone = 'America/New_York'; // adjust if you need a different default
+
+    return {
+      time: date.toLocaleTimeString([], {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: timezone,
+        hour12: true,
+      }),
+      date: date.toLocaleDateString([], {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        timeZone: timezone,
+      })
+    };
+  };
+
+  const formattedClockIn = formatClockIn(clockInTimestamp);
   const isPaused = isTimeSession && !!activeSession?.paused_at;
 
   if (!user || !profile) {
@@ -424,8 +447,16 @@ const Dashboard = () => {
             <CardContent className="space-y-6">
               {activeSession ? (
                 <>
-                  {clockInTimestamp && (
-                    <TimeDisplay time={clockInTimestamp} label="Clocked in at" />
+                  {formattedClockIn && (
+                    <div className="flex flex-col">
+                      <span className="text-sm text-muted-foreground">Clocked in at</span>
+                      <span className="text-2xl font-semibold">
+                        {formattedClockIn.time}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {formattedClockIn.date}
+                      </span>
+                    </div>
                   )}
                   {isTimeSession ? (
                     <>
