@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editDisplayName, setEditDisplayName] = useState('');
+  const latestFetchIdRef = useRef(0);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -173,6 +174,16 @@ const Dashboard = () => {
   };
 
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
+    const fetchId = Date.now();
+    latestFetchIdRef.current = fetchId;
+
+    const updateActiveSession = (session: any) => {
+      if (latestFetchIdRef.current !== fetchId) {
+        return;
+      }
+      setActiveSession(session);
+    };
+
     const baseUrl =
       typeof window !== 'undefined' && window.location.origin?.includes('localhost')
         ? 'https://work-timer-hub.vercel.app'
@@ -184,7 +195,7 @@ const Dashboard = () => {
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.session) {
-            setActiveSession({ ...result.session, source: "clock_in_records" });
+            updateActiveSession({ ...result.session, source: "clock_in_records" });
             return;
           }
         } else {
@@ -219,11 +230,11 @@ const Dashboard = () => {
       if (clockInRecord) {
         const syncedSession = await syncClockInRecordToTimeSession(userId, clockInRecord);
         if (syncedSession?.session) {
-          setActiveSession({ ...syncedSession.session, source: "time_sessions", clockInRecordId: syncedSession.clockInRecordId });
+          updateActiveSession({ ...syncedSession.session, source: "time_sessions", clockInRecordId: syncedSession.clockInRecordId });
           return;
         }
 
-        setActiveSession({ ...clockInRecord, source: "clock_in_records" });
+        updateActiveSession({ ...clockInRecord, source: "clock_in_records" });
         return;
       }
     }
@@ -241,7 +252,7 @@ const Dashboard = () => {
       console.error("Error fetching time session:", timeSessionError);
     }
 
-    setActiveSession(timeSession ? { ...timeSession, source: "time_sessions" } : null);
+    updateActiveSession(timeSession ? { ...timeSession, source: "time_sessions" } : null);
   };
 
   const fetchAllUsers = async () => {
