@@ -166,6 +166,30 @@ const Dashboard = () => {
   };
 
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
+    console.log(`[Dashboard] fetchActiveSession userId=${userId} employeeId=${currentEmployeeId ?? 'null'} email=${user?.email ?? 'unknown'}`);
+
+    const baseUrl =
+      typeof window !== 'undefined' && window.location.origin?.includes('localhost')
+        ? 'https://work-timer-hub.vercel.app'
+        : window.location.origin || 'https://work-timer-hub.vercel.app';
+
+    if (user?.email) {
+      try {
+        const response = await fetch(`${baseUrl}/api/get-active-session?email=${encodeURIComponent(user.email)}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.session) {
+            setActiveSession({ ...result.session, source: "clock_in_records" });
+            return;
+          }
+        } else {
+          console.error("Failed to fetch active session via API:", await response.text());
+        }
+      } catch (error) {
+        console.error("Error calling get-active-session API:", error);
+      }
+    }
+
     if (currentEmployeeId) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -182,6 +206,8 @@ const Dashboard = () => {
         .order("clock_in_time", { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      console.log('[Dashboard] clock_in_records response', JSON.stringify({ clockInRecord, clockInError }));
 
       if (clockInError) {
         console.error("Error fetching clock-in records:", clockInError);
