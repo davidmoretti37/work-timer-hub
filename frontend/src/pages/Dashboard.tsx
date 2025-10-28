@@ -190,7 +190,10 @@ const Dashboard = () => {
 
     if (user?.email) {
       try {
-        const response = await fetch(`${baseUrl}/api/get-active-session?email=${encodeURIComponent(user.email)}`);
+        const response = await fetch(
+          `${baseUrl}/api/get-active-session?email=${encodeURIComponent(user.email)}`,
+          { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }
+        );
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.session) {
