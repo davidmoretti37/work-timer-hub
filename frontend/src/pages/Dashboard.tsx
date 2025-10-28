@@ -175,6 +175,7 @@ const Dashboard = () => {
 
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
     const fetchId = ++fetchSeqRef.current;
+    console.log('[Dashboard] Starting fetchActiveSession', { fetchId, userId, currentEmployeeId, email: user?.email });
 
     const updateActiveSession = (session: any) => {
       if (fetchId < fetchSeqRef.current) {
