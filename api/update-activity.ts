@@ -26,7 +26,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { email, status, last_activity: lastActivityOverride } = req.body ?? {};
+    const { email, status, last_activity: lastActivityOverride, idle_seconds } = req.body ?? {};
 
     console.log('[update-activity] Incoming payload', req.body);
 
@@ -58,6 +58,7 @@ export default async function handler(req: any, res: any) {
       return parsed.toISOString();
     })();
 
+    // First, update employee_activity table
     const upsertPayload = {
       email: normalizedEmail,
       status: normalizedStatus,
@@ -74,6 +75,34 @@ export default async function handler(req: any, res: any) {
     if (activityError) {
       console.error('[update-activity] Failed to upsert employee_activity record:', activityError);
       return res.status(500).json({ success: false, error: activityError.message ?? 'Failed to persist activity status' });
+    }
+
+    // If idle_seconds provided and status is idle, update the today's clock_in_records
+    if (idle_seconds && normalizedStatus === 'idle') {
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .single();
+
+      if (employee) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const { error: clockInError } = await supabase
+          .from('clock_in_records')
+          .update({ idle_seconds: idle_seconds })
+          .eq('employee_id', employee.id)
+          .eq('status', 'clocked_in')
+          .gte('clock_in_time', today.toISOString())
+          .lt('clock_in_time', tomorrow.toISOString());
+
+        if (clockInError) {
+          console.error('[update-activity] Failed to update idle_seconds:', clockInError);
+        }
+      }
     }
 
     return res.status(200).json({
