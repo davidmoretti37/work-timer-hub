@@ -21,6 +21,7 @@ const Dashboard = () => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editDisplayName, setEditDisplayName] = useState('');
   const fetchSeqRef = useRef(0);
+  const hasManuallyClockOutToday = useRef(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -172,7 +173,7 @@ const Dashboard = () => {
 
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
     const fetchId = ++fetchSeqRef.current;
-    console.log('[Dashboard] Starting fetchActiveSession', { fetchId, userId, currentEmployeeId, email: user?.email });
+    console.log('[Dashboard] Starting fetchActiveSession', { fetchId, userId, currentEmployeeId, email: user?.email, hasManuallyClockOutToday: hasManuallyClockOutToday.current });
 
     const updateActiveSession = (session: any) => {
       if (fetchId < fetchSeqRef.current) {
@@ -188,7 +189,8 @@ const Dashboard = () => {
         ? 'https://work-timer-hub.vercel.app'
         : window.location.origin || 'https://work-timer-hub.vercel.app';
 
-    if (user?.email) {
+    // Skip API call if user manually clocked out today
+    if (user?.email && !hasManuallyClockOutToday.current) {
       try {
         const response = await fetch(
           `${baseUrl}/api/get-active-session?email=${encodeURIComponent(user.email)}`,
@@ -207,6 +209,8 @@ const Dashboard = () => {
       } catch (error) {
         console.error("Error calling get-active-session API:", error);
       }
+    } else if (hasManuallyClockOutToday.current) {
+      console.log('[Dashboard] Skipping API call - user manually clocked out today');
     }
 
     if (currentEmployeeId) {
@@ -439,6 +443,7 @@ const Dashboard = () => {
         title: "Clocked Out",
         description: "Your work session has ended",
       });
+      hasManuallyClockOutToday.current = true;
       await fetchActiveSession(user.id, employeeId);
       setLoading(false);
       return;
@@ -479,6 +484,7 @@ const Dashboard = () => {
         title: "Clocked Out",
         description: "Your work session has ended",
       });
+      hasManuallyClockOutToday.current = true;
       await fetchActiveSession(user.id, employeeId);
     }
     setLoading(false);
