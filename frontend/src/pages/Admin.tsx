@@ -22,7 +22,7 @@ const Admin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileCreationAttempted, setProfileCreationAttempted] = useState<Set<string>>(new Set());
   const [userFilters, setUserFilters] = useState<Map<string, { period: string; customStart?: Date; customEnd?: Date }>>(new Map());
-  const [activityRecords, setActivityRecords] = useState<Array<{ email: string; status: string; last_activity: string; updated_at: string; created_at: string }>>([]);
+  const [activityRecords, setActivityRecords] = useState<Array<{ email: string; status: string; last_activity: string | null; updated_at: string; created_at: string }>>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityError, setActivityError] = useState<string | null>(null);
   const navigate = useNavigate();
