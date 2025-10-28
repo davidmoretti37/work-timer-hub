@@ -199,6 +199,7 @@ const Dashboard = () => {
         );
         if (response.ok) {
           const result = await response.json();
+          console.log('[Dashboard] API response', { fetchId, result });
           if (result.success && result.session) {
             updateActiveSession({ ...result.session, source: "clock_in_records" });
             return;
@@ -233,6 +234,7 @@ const Dashboard = () => {
       }
 
       if (clockInRecord) {
+        console.log('[Dashboard] Found clockInRecord from Supabase', { fetchId, clockInRecord });
         const syncedSession = await syncClockInRecordToTimeSession(userId, clockInRecord);
         if (syncedSession?.session) {
           updateActiveSession({ ...syncedSession.session, source: "time_sessions", clockInRecordId: syncedSession.clockInRecordId });
@@ -257,6 +259,7 @@ const Dashboard = () => {
       console.error("Error fetching time session:", timeSessionError);
     }
 
+    console.log('[Dashboard] Final fallback to timeSession', { fetchId, timeSession });
     updateActiveSession(timeSession ? { ...timeSession, source: "time_sessions" } : null);
   };
 
