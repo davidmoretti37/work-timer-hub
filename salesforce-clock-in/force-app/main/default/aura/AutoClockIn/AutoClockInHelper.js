@@ -32,8 +32,9 @@
             lastSentAt: 0,
             activityFlag: true,
             heartbeatMs: 5 * 60 * 1000,
-            idleThresholdMs: 30 * 60 * 1000,
-            idleTimeoutMs: 10 * 60 * 1000,
+            // Shortened for local testing; restore production values before deploying broadly.
+            idleThresholdMs: 1 * 60 * 1000,
+            idleTimeoutMs: 15 * 1000,
             listeners: [],
             intervalId: null,
             pending: false,
