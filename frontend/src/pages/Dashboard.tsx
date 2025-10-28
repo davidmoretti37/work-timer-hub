@@ -29,8 +29,16 @@ const Dashboard = () => {
   // Reset clock-out flag if it's a new day
   useEffect(() => {
     const today = new Date().toDateString();
-    if (lastClockOutDate.current && lastClockOutDate.current !== today) {
+    const storedDate = localStorage.getItem('lastClockOutDate');
+    const storedFlag = localStorage.getItem('hasManuallyClockOutToday') === 'true';
+    
+    if (storedDate && storedDate !== today) {
       hasManuallyClockOutToday.current = false;
+      localStorage.removeItem('hasManuallyClockOutToday');
+      localStorage.removeItem('lastClockOutDate');
+    } else if (storedFlag) {
+      hasManuallyClockOutToday.current = true;
+      lastClockOutDate.current = storedDate;
     }
   }, []);
 
@@ -457,8 +465,11 @@ const Dashboard = () => {
         title: "Clocked Out",
         description: "Your work session has ended",
       });
+      const today = new Date().toDateString();
       hasManuallyClockOutToday.current = true;
-      lastClockOutDate.current = new Date().toDateString();
+      lastClockOutDate.current = today;
+      localStorage.setItem('hasManuallyClockOutToday', 'true');
+      localStorage.setItem('lastClockOutDate', today);
       await fetchActiveSession(user.id, employeeId);
       setLoading(false);
       return;
@@ -499,8 +510,11 @@ const Dashboard = () => {
         title: "Clocked Out",
         description: "Your work session has ended",
       });
+      const today = new Date().toDateString();
       hasManuallyClockOutToday.current = true;
-      lastClockOutDate.current = new Date().toDateString();
+      lastClockOutDate.current = today;
+      localStorage.setItem('hasManuallyClockOutToday', 'true');
+      localStorage.setItem('lastClockOutDate', today);
       await fetchActiveSession(user.id, employeeId);
     }
     setLoading(false);
