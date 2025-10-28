@@ -178,8 +178,10 @@ const Dashboard = () => {
 
     const updateActiveSession = (session: any) => {
       if (fetchId < fetchSeqRef.current) {
+        console.log('[Dashboard] Skipping stale update', { fetchId, current: fetchSeqRef.current, session });
         return;
       }
+      console.log('[Dashboard] Updating active session', { fetchId, current: fetchSeqRef.current, session });
       setActiveSession(session);
     };
 
