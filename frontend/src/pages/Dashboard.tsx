@@ -37,7 +37,6 @@ const Dashboard = () => {
       await fetchProfile(session.user.id);
       const currentEmployeeId = await fetchEmployeeId(session.user.email);
       const adminStatus = await checkAdminStatus(session.user.id);
-      await fetchActiveSession(session.user.id, currentEmployeeId);
       
       if (adminStatus) {
         await fetchAllUsers();
@@ -52,9 +51,7 @@ const Dashboard = () => {
       } else {
         setUser(session.user);
         fetchProfile(session.user.id);
-        fetchEmployeeId(session.user.email).then((id) => {
-          fetchActiveSession(session.user.id, id);
-        });
+        fetchEmployeeId(session.user.email);
         checkAdminStatus(session.user.id);
       }
     });
