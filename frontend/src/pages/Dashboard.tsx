@@ -433,12 +433,17 @@ const Dashboard = () => {
         updateData.paused_at = null;
       }
 
-      const { error } = await supabase
+      console.log('[Clock Out] Updating clock_in_records:', { id: activeSession.id, updateData });
+      const { error, data } = await supabase
         .from("clock_in_records")
         .update(updateData)
-        .eq("id", activeSession.id);
+        .eq("id", activeSession.id)
+        .select();
+
+      console.log('[Clock Out] Update result:', { error, data });
 
       if (error) {
+        console.error('[Clock Out] Update failed:', error);
         toast({
           title: "Error",
           description: "Failed to clock out",
