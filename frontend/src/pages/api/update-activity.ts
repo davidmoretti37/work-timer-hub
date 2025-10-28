@@ -41,6 +41,12 @@ export default async function handler(
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    const normalizedStatus = status.toLowerCase().trim();
+
+    if (!['active', 'idle'].includes(normalizedStatus)) {
+      return res.status(400).json({ success: false, error: 'Invalid status value' });
+    }
+
     const timestamp = new Date().toISOString();
 
     const { data: employee, error: empError } = await supabase
@@ -56,7 +62,7 @@ export default async function handler(
     const { error: updateError } = await supabase
       .from('employees')
       .update({
-        status,
+        status: normalizedStatus,
         last_activity: timestamp,
       })
       .eq('id', employee.id);
@@ -69,7 +75,7 @@ export default async function handler(
       .from('activity_log')
       .insert({
         employee_id: employee.id,
-        status,
+        status: normalizedStatus,
         timestamp,
       });
 
@@ -77,11 +83,29 @@ export default async function handler(
       console.error('Failed to log activity:', logError);
     }
 
+    const { data: activityRecord, error: activityError } = await supabase
+      .from('employee_activity')
+      .upsert({
+        email: normalizedEmail,
+        status: normalizedStatus,
+        last_activity: timestamp,
+        updated_at: timestamp,
+        created_at: timestamp,
+      }, { onConflict: 'email' })
+      .select()
+      .single();
+
+    if (activityError) {
+      console.error('Failed to upsert employee_activity record:', activityError);
+      return res.status(500).json({ success: false, error: 'Failed to persist activity status' });
+    }
+
     return res.status(200).json({
       success: true,
-      message: `Status updated to ${status}`,
+      message: `Status updated to ${normalizedStatus}`,
       employee_id: employee.id,
       employee_name: employee.name ?? null,
+      activity: activityRecord,
     });
   } catch (error: any) {
     console.error('Error:', error);

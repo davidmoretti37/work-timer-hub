@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Users, CalendarIcon, Download, FileSpreadsheet } from "lucide-react";
 import { formatHoursDetailed } from "@/utils/timeUtils";
-import { format, subWeeks, subMonths, startOfDay, endOfDay, isWithinInterval, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
+import { format, subWeeks, subMonths, startOfDay, endOfDay, isWithinInterval, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval, formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
 
@@ -22,6 +22,9 @@ const Admin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileCreationAttempted, setProfileCreationAttempted] = useState<Set<string>>(new Set());
   const [userFilters, setUserFilters] = useState<Map<string, { period: string; customStart?: Date; customEnd?: Date }>>(new Map());
+  const [activityRecords, setActivityRecords] = useState<Array<{ email: string; status: string; last_activity: string; updated_at: string; created_at: string }>>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -55,6 +58,28 @@ const Admin = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const load = async () => {
+      if (!isMounted) return;
+      await fetchEmployeeActivity();
+    };
+
+    load();
+
+    const interval = setInterval(load, 30000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isAdmin]);
 
   const checkAdminStatus = async (userId: string) => {
     const { data } = await supabase
@@ -110,6 +135,31 @@ const Admin = () => {
           }
         }
       }
+    }
+
+    await fetchEmployeeActivity();
+  };
+
+  const fetchEmployeeActivity = async () => {
+    try {
+      setActivityLoading(true);
+      setActivityError(null);
+
+      const { data, error } = await supabase
+        .from('employee_activity')
+        .select('email, status, last_activity, updated_at, created_at')
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      setActivityRecords(data ?? []);
+    } catch (error: any) {
+      console.error('Failed to fetch employee activity:', error);
+      setActivityError('Unable to load employee activity data');
+    } finally {
+      setActivityLoading(false);
     }
   };
 
@@ -646,6 +696,59 @@ const Admin = () => {
             </TabsContent>
             
             <TabsContent value="users" className="space-y-6 mt-6">
+              <Card className="container-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Salesforce Activity</span>
+                    <span className="text-sm text-muted-foreground">Updates every 30 seconds</span>
+                  </CardTitle>
+                  <CardDescription>Latest status reported by the Salesforce activity tracker extension</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {activityLoading ? (
+                    <div className="text-sm text-muted-foreground">Loading activity...</div>
+                  ) : activityError ? (
+                    <div className="text-sm text-destructive">{activityError}</div>
+                  ) : activityRecords.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">No activity updates yet.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {activityRecords.map((record) => {
+                        const lastActivity = record.last_activity ? new Date(record.last_activity) : null;
+                        const relative = lastActivity ? formatDistanceToNow(lastActivity, { addSuffix: true }) : 'Unknown';
+                        const idleDuration = record.status === 'idle' && lastActivity
+                          ? formatDistanceToNow(lastActivity, { addSuffix: false })
+                          : null;
+
+                        return (
+                          <div
+                            key={record.email}
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md border p-3 bg-muted/40"
+                          >
+                            <div>
+                              <p className="font-medium">{record.email}</p>
+                              <p className="text-xs text-muted-foreground">Last activity {relative}</p>
+                            </div>
+                            <div className="flex flex-col items-start sm:items-end gap-1">
+                              <span
+                                className={`flex items-center gap-2 text-sm font-medium ${record.status === 'active' ? 'text-green-600' : 'text-red-600'}`}
+                              >
+                                <span
+                                  className={`h-2.5 w-2.5 rounded-full ${record.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`}
+                                ></span>
+                                {record.status === 'active' ? 'Active' : 'Idle'}
+                              </span>
+                              {record.status === 'idle' && idleDuration && (
+                                <span className="text-xs text-muted-foreground">Inactive for {idleDuration}</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
               {uniqueUserIds.map((userId) => {
                 const profile = profiles.get(userId);
                 const stats = calculateFilteredUserStats(userId);

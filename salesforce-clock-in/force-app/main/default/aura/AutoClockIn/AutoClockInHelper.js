@@ -87,6 +87,15 @@
         }, 60000);
 
         window._workTimerHubTracker = tracker;
+        try {
+            console.log('Activity tracker initialized', {
+                email: tracker.userEmail,
+                idleThresholdMs: tracker.idleThresholdMs,
+                idleTimeoutMs: tracker.idleTimeoutMs
+            });
+        } catch (e) {
+            // Ignore console logging failures
+        }
 
         helper.sendStatus(component, tracker, 'active', true);
     },
