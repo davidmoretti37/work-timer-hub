@@ -22,8 +22,17 @@ const Dashboard = () => {
   const [editDisplayName, setEditDisplayName] = useState('');
   const fetchSeqRef = useRef(0);
   const hasManuallyClockOutToday = useRef(false);
+  const lastClockOutDate = useRef<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Reset clock-out flag if it's a new day
+  useEffect(() => {
+    const today = new Date().toDateString();
+    if (lastClockOutDate.current && lastClockOutDate.current !== today) {
+      hasManuallyClockOutToday.current = false;
+    }
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -444,6 +453,7 @@ const Dashboard = () => {
         description: "Your work session has ended",
       });
       hasManuallyClockOutToday.current = true;
+      lastClockOutDate.current = new Date().toDateString();
       await fetchActiveSession(user.id, employeeId);
       setLoading(false);
       return;
@@ -485,6 +495,7 @@ const Dashboard = () => {
         description: "Your work session has ended",
       });
       hasManuallyClockOutToday.current = true;
+      lastClockOutDate.current = new Date().toDateString();
       await fetchActiveSession(user.id, employeeId);
     }
     setLoading(false);
