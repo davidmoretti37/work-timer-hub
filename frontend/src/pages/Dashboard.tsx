@@ -61,6 +61,13 @@ const Dashboard = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  useEffect(() => {
+    if (!user || !employeeId || !user.id) {
+      return;
+    }
+    fetchActiveSession(user.id, employeeId);
+  }, [user, employeeId]);
+
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from("profiles")
@@ -166,8 +173,6 @@ const Dashboard = () => {
   };
 
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
-    console.log(`[Dashboard] fetchActiveSession userId=${userId} employeeId=${currentEmployeeId ?? 'null'} email=${user?.email ?? 'unknown'}`);
-
     const baseUrl =
       typeof window !== 'undefined' && window.location.origin?.includes('localhost')
         ? 'https://work-timer-hub.vercel.app'
@@ -206,8 +211,6 @@ const Dashboard = () => {
         .order("clock_in_time", { ascending: false })
         .limit(1)
         .maybeSingle();
-
-      console.log('[Dashboard] clock_in_records response', JSON.stringify({ clockInRecord, clockInError }));
 
       if (clockInError) {
         console.error("Error fetching clock-in records:", clockInError);
