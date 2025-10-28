@@ -585,7 +585,7 @@ const Dashboard = () => {
     if (!timestamp) return null;
     const date = new Date(timestamp);
 
-    const timezone = 'America/New_York'; // adjust if you need a different default
+    const timezone = 'America/New_York';
 
     return {
       time: date.toLocaleTimeString([], {

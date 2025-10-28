@@ -53,7 +53,7 @@ export default async function handler(req: any, res: any) {
 
     const { data: record, error: recordError } = await supabase
       .from('clock_in_records')
-      .select('id, employee_id, clock_in_time, status')
+      .select('id, employee_id, clock_in_time, status, clock_out_time')
       .eq('employee_id', employee.id)
       .eq('status', 'clocked_in')
       .gte('clock_in_time', today.toISOString())
@@ -66,6 +66,7 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ success: false, error: recordError.message });
     }
 
+    console.log('[get-active-session] Found record:', { record, email });
     return res.status(200).json({ success: true, session: record ?? null });
   } catch (error: any) {
     console.error('[get-active-session] Unexpected error:', error);
