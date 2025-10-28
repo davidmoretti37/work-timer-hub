@@ -20,7 +20,7 @@ const Dashboard = () => {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editDisplayName, setEditDisplayName] = useState('');
-  const latestFetchIdRef = useRef(0);
+  const fetchSeqRef = useRef(0);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -174,11 +174,10 @@ const Dashboard = () => {
   };
 
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
-    const fetchId = Date.now();
-    latestFetchIdRef.current = fetchId;
+    const fetchId = ++fetchSeqRef.current;
 
     const updateActiveSession = (session: any) => {
-      if (latestFetchIdRef.current !== fetchId) {
+      if (fetchId < fetchSeqRef.current) {
         return;
       }
       setActiveSession(session);
