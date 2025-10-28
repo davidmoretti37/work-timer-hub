@@ -400,14 +400,51 @@ const Dashboard = () => {
 
   const handleClockOut = async () => {
     if (!user || !activeSession) return;
-    if (activeSession.source !== "time_sessions") {
+
+    // Handle Salesforce-managed clock-ins (clock_in_records)
+    if (activeSession.source === "clock_in_records") {
+      setLoading(true);
+      const clockOutTime = new Date().toISOString();
+
+      // If paused, finalize break duration before clocking out
+      let updateData: any = {
+        status: "clocked_out",
+        clock_out_time: clockOutTime,
+      };
+
+      if (activeSession.paused_at) {
+        const pausedAt = new Date(activeSession.paused_at);
+        const deltaSec = Math.max(0, Math.floor((Date.now() - pausedAt.getTime()) / 1000));
+        const newBreakSeconds = (activeSession.break_seconds || 0) + deltaSec;
+        updateData.break_seconds = newBreakSeconds;
+        updateData.paused_at = null;
+      }
+
+      const { error } = await supabase
+        .from("clock_in_records")
+        .update(updateData)
+        .eq("id", activeSession.id);
+
+      if (error) {
+        toast({
+          title: "Error",
+          description: "Failed to clock out",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
       toast({
-        title: "Clock out unavailable",
-        description: "This clock-in is managed externally.",
+        title: "Clocked Out",
+        description: "Your work session has ended",
       });
+      await fetchActiveSession(user.id, employeeId);
+      setLoading(false);
       return;
     }
 
+    // Handle regular time_sessions
     setLoading(true);
     const clockOutTime = new Date().toISOString();
     const { error } = await supabase
@@ -484,6 +521,53 @@ const Dashboard = () => {
       if (error) {
         throw error;
       }
+      await fetchActiveSession(user.id, employeeId);
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message || "Failed to resume from break", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePauseClockInRecord = async () => {
+    if (!user || !activeSession) return;
+    if (activeSession.source !== "clock_in_records") return;
+
+    setLoading(true);
+    const { error } = await supabase
+      .from("clock_in_records")
+      .update({ paused_at: new Date().toISOString() })
+      .eq("id", activeSession.id);
+
+    if (error) {
+      toast({ title: "Error", description: "Failed to start lunch break", variant: "destructive" });
+    } else {
+      toast({ title: "Lunch Break Started", description: "Your break has started" });
+      await fetchActiveSession(user.id, employeeId);
+    }
+    setLoading(false);
+  };
+
+  const handleResumeClockInRecord = async () => {
+    if (!user || !activeSession || !activeSession.paused_at) return;
+    if (activeSession.source !== "clock_in_records") return;
+
+    setLoading(true);
+    try {
+      const pausedAt = new Date(activeSession.paused_at);
+      const deltaSec = Math.max(0, Math.floor((Date.now() - pausedAt.getTime()) / 1000));
+      const newBreakSeconds = (activeSession.break_seconds || 0) + deltaSec;
+
+      const { error } = await supabase
+        .from("clock_in_records")
+        .update({ break_seconds: newBreakSeconds, paused_at: null })
+        .eq("id", activeSession.id);
+
+      if (error) {
+        throw error;
+      }
+
+      toast({ title: "Resumed", description: "You're back from break" });
       await fetchActiveSession(user.id, employeeId);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to resume from break", variant: "destructive" });
@@ -601,9 +685,41 @@ const Dashboard = () => {
                       )}
                     </>
                   ) : (
-                    <p className="text-muted-foreground">
-                      Clock-in recorded via Salesforce integration. Clock out from Salesforce to update your status.
-                    </p>
+                    <>
+                      <Button
+                        onClick={handleClockOut}
+                        disabled={loading}
+                        variant="destructive"
+                        size="lg"
+                        className="w-full"
+                      >
+                        <StopCircle className="mr-2 h-5 w-5" />
+                        Clock Out
+                      </Button>
+                      {activeSession.paused_at ? (
+                        <Button
+                          onClick={handleResumeClockInRecord}
+                          disabled={loading}
+                          variant="secondary"
+                          size="lg"
+                          className="w-full"
+                        >
+                          <Play className="mr-2 h-5 w-5" />
+                          Resume from Lunch Break
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handlePauseClockInRecord}
+                          disabled={loading}
+                          variant="outline"
+                          size="lg"
+                          className="w-full"
+                        >
+                          <PauseCircle className="mr-2 h-5 w-5" />
+                          Pause for Lunch Break
+                        </Button>
+                      )}
+                    </>
                   )}
                 </>
               ) : (
