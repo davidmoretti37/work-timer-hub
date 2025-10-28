@@ -84,7 +84,7 @@
 
         tracker.intervalId = window.setInterval(function() {
             helper.evaluateStatus(component, tracker, false);
-        }, 60000);
+        }, 1000);
 
         window._workTimerHubTracker = tracker;
         try {
