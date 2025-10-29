@@ -14,19 +14,19 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 export function BirthdayPopup() {
+  const [user, setUser] = useState<any>(null);
   const [open, setOpen] = useState(false);
   const [birthday, setBirthday] = useState('');
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     const checkBirthday = async () => {
-      // Get current user session
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
 
-      setUserId(session.user.id);
+      if (!session) return;
+
+      setUser(session.user);
 
       // Check if user has already set their birthday
       const { data, error } = await supabase
@@ -51,14 +51,14 @@ export function BirthdayPopup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userId || !birthday) return;
+    if (!user || !birthday) return;
 
     setLoading(true);
 
     const { error } = await supabase
       .from('profiles')
       .update({ date_of_birth: birthday })
-      .eq('id', userId);
+      .eq('id', user.id);
 
     if (error) {
       console.error('Error saving birthday:', error);
@@ -81,12 +81,12 @@ export function BirthdayPopup() {
   const handleSkip = () => {
     // Set a far future date to indicate they skipped
     // This prevents the popup from showing again
-    if (!userId) return;
+    if (!user) return;
 
     supabase
       .from('profiles')
       .update({ date_of_birth: '9999-12-31' })
-      .eq('id', userId)
+      .eq('id', user.id)
       .then(() => {
         setOpen(false);
       });
