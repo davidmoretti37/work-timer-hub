@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/integrations/supabase/auth';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -15,21 +14,25 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 
 export function BirthdayPopup() {
-  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [birthday, setBirthday] = useState('');
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     const checkBirthday = async () => {
-      if (!user) return;
+      // Get current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      setUserId(session.user.id);
 
       // Check if user has already set their birthday
       const { data, error } = await supabase
         .from('profiles')
         .select('date_of_birth')
-        .eq('id', user.id)
+        .eq('id', session.user.id)
         .single();
 
       if (error) {
@@ -44,18 +47,18 @@ export function BirthdayPopup() {
     };
 
     checkBirthday();
-  }, [user]);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !birthday) return;
+    if (!userId || !birthday) return;
 
     setLoading(true);
 
     const { error } = await supabase
       .from('profiles')
       .update({ date_of_birth: birthday })
-      .eq('id', user.id);
+      .eq('id', userId);
 
     if (error) {
       console.error('Error saving birthday:', error);
@@ -78,12 +81,12 @@ export function BirthdayPopup() {
   const handleSkip = () => {
     // Set a far future date to indicate they skipped
     // This prevents the popup from showing again
-    if (!user) return;
+    if (!userId) return;
 
     supabase
       .from('profiles')
       .update({ date_of_birth: '9999-12-31' })
-      .eq('id', user.id)
+      .eq('id', userId)
       .then(() => {
         setOpen(false);
       });
