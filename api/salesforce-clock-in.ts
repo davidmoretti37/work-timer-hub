@@ -23,13 +23,22 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { email } = req.body ?? {};
+    const { email, login_time: loginTimeRaw } = req.body ?? {};
 
     if (!email) {
       return res.status(400).json({ success: false, error: 'Missing email' });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
+
+    let providedLoginTime: Date | null = null;
+    if (loginTimeRaw) {
+      const candidate = new Date(loginTimeRaw);
+      if (Number.isNaN(candidate.getTime())) {
+        return res.status(400).json({ success: false, error: 'Invalid login_time' });
+      }
+      providedLoginTime = candidate;
+    }
 
     const { data: employee, error: empError } = await supabase
       .from('employees')
@@ -48,7 +57,7 @@ export default async function handler(req: any, res: any) {
 
     const { data: existing } = await supabase
       .from('clock_in_records')
-      .select('id')
+      .select('id, clock_in_time')
       .eq('employee_id', employee.id)
       .gte('clock_in_time', today.toISOString())
       .lt('clock_in_time', tomorrow.toISOString())
@@ -56,18 +65,35 @@ export default async function handler(req: any, res: any) {
       .limit(1);
 
     if (existing && existing.length > 0) {
+      const existingRecord = existing[0];
+
+      if (providedLoginTime && existingRecord.clock_in_time) {
+        const existingTime = new Date(existingRecord.clock_in_time);
+        if (!Number.isNaN(existingTime.getTime()) && existingTime > providedLoginTime) {
+          const updatedTimeIso = providedLoginTime.toISOString();
+          await supabase
+            .from('clock_in_records')
+            .update({ clock_in_time: updatedTimeIso })
+            .eq('id', existingRecord.id);
+          existingRecord.clock_in_time = updatedTimeIso;
+        }
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Already clocked in today',
         employee_id: employee.id,
+        clock_in_time: existing[0].clock_in_time,
       });
     }
+
+    const clockInTimeIso = (providedLoginTime ?? new Date()).toISOString();
 
     const { data: clockIn, error: clockError } = await supabase
       .from('clock_in_records')
       .insert({
         employee_id: employee.id,
-        clock_in_time: new Date().toISOString(),
+        clock_in_time: clockInTimeIso,
         status: 'clocked_in',
       })
       .select()
