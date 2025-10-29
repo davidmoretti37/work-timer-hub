@@ -26,6 +26,7 @@ const Calendar = () => {
   const [savingEvent, setSavingEvent] = useState(false);
   const [monthEventsByDate, setMonthEventsByDate] = useState<Record<string, any[]>>({});
   const [newEventFiles, setNewEventFiles] = useState<File[]>([]);
+  const [birthdays, setBirthdays] = useState<any[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -62,6 +63,7 @@ const Calendar = () => {
   useEffect(() => {
     if (user) {
       fetchPTORequests();
+      fetchBirthdays();
     }
   }, [user]);
 
@@ -152,6 +154,32 @@ const Calendar = () => {
       const startDate = new Date(pto.start_date);
       const endDate = new Date(pto.end_date);
       return date >= startDate && date <= endDate;
+    });
+  };
+
+  const fetchBirthdays = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, date_of_birth")
+        .not("date_of_birth", "is", null)
+        .neq("date_of_birth", "9999-12-31"); // Exclude users who skipped
+
+      if (error) throw error;
+
+      setBirthdays(data || []);
+    } catch (error) {
+      console.error("Error fetching birthdays:", error);
+    }
+  };
+
+  const getBirthdaysForDate = (date: Date) => {
+    return birthdays.filter(person => {
+      if (!person.date_of_birth) return false;
+      const birthDate = new Date(person.date_of_birth);
+      // Match month and day, ignoring year
+      return birthDate.getMonth() === date.getMonth() &&
+             birthDate.getDate() === date.getDate();
     });
   };
 
@@ -408,6 +436,7 @@ const Calendar = () => {
                 const ptoForDate = getPTOForDate(date);
                 const iso = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())).toISOString().slice(0,10);
                 const eventsForDay = monthEventsByDate[iso] || [];
+                const birthdaysForDay = getBirthdaysForDate(date);
                 
                 return (
                   <div
@@ -460,6 +489,20 @@ const Calendar = () => {
                         <div className="text-[10px] text-muted-foreground">+{eventsForDay.length - 2} more</div>
                       )}
                     </div>
+
+                    {/* Birthdays */}
+                    <div className="space-y-1 mt-1">
+                      {birthdaysForDay.map((person: any) => (
+                        <div
+                          key={person.id}
+                          className="text-xs bg-gradient-to-r from-pink-100 to-purple-100 text-purple-800 px-2 py-1 rounded truncate border border-purple-200 font-medium"
+                          title={`${person.full_name}'s Birthday`}
+                        >
+                          <span className="mr-1">🎈</span>
+                          {person.full_name}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 );
               })}
@@ -475,6 +518,30 @@ const Calendar = () => {
               {selectedDate ? format(selectedDate, "PPP") : "Selected Day"}
             </DialogTitle>
           </DialogHeader>
+
+          {/* Birthdays */}
+          {selectedDate && getBirthdaysForDate(selectedDate).length > 0 && (
+            <div className="space-y-2 mb-4">
+              <h4 className="font-semibold flex items-center gap-2">
+                <span>🎈</span>
+                Birthdays
+              </h4>
+              <div className="space-y-2">
+                {getBirthdaysForDate(selectedDate).map((person) => (
+                  <div
+                    key={person.id}
+                    className="flex items-center gap-3 border rounded-lg p-3 bg-gradient-to-r from-pink-50 to-purple-50 border-purple-200"
+                  >
+                    <div className="text-2xl">🎂</div>
+                    <div className="text-sm">
+                      <div className="font-semibold text-purple-900">{person.full_name}</div>
+                      <div className="text-xs text-purple-700">Happy Birthday!</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* PTO list */}
           <div className="space-y-2">
