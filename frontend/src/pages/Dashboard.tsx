@@ -590,20 +590,17 @@ const Dashboard = () => {
     if (!timestamp) return null;
     const date = new Date(timestamp);
 
-    const timezone = 'America/New_York';
-
+    // Use browser's local timezone automatically - no need to hardcode
     return {
       time: date.toLocaleTimeString([], {
         hour: 'numeric',
         minute: '2-digit',
-        timeZone: timezone,
         hour12: true,
       }),
       date: date.toLocaleDateString([], {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
-        timeZone: timezone,
       })
     };
   };

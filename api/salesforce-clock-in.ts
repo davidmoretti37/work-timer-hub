@@ -50,11 +50,13 @@ export default async function handler(req: any, res: any) {
       return res.status(404).json({ success: false, error: 'Employee not found' });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Use UTC to calculate today's boundaries to avoid timezone issues
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
+    // Check if user is already clocked in today
     const { data: existing } = await supabase
       .from('clock_in_records')
       .select('id, clock_in_time')
@@ -84,6 +86,25 @@ export default async function handler(req: any, res: any) {
         message: 'Already clocked in today',
         employee_id: employee.id,
         clock_in_time: existing[0].clock_in_time,
+      });
+    }
+
+    // If user already clocked out today, do NOT auto clock them back in
+    const { data: endedToday } = await supabase
+      .from('clock_in_records')
+      .select('id, clock_in_time, clock_out_time, status')
+      .eq('employee_id', employee.id)
+      .gte('clock_in_time', today.toISOString())
+      .lt('clock_in_time', tomorrow.toISOString())
+      .order('clock_in_time', { ascending: false })
+      .limit(1);
+
+    if (endedToday && endedToday.length > 0 && endedToday[0].status === 'clocked_out') {
+      return res.status(200).json({
+        success: true,
+        message: 'Already clocked out today',
+        employee_id: employee.id,
+        clock_in_time: endedToday[0].clock_in_time,
       });
     }
 
