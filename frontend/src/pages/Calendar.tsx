@@ -176,10 +176,11 @@ const Calendar = () => {
   const getBirthdaysForDate = (date: Date) => {
     return birthdays.filter(person => {
       if (!person.date_of_birth) return false;
-      const birthDate = new Date(person.date_of_birth);
-      // Match month and day, ignoring year
-      return birthDate.getMonth() === date.getMonth() &&
-             birthDate.getDate() === date.getDate();
+      // Parse date string directly to avoid timezone conversion
+      const [year, month, day] = person.date_of_birth.split('-').map(Number);
+      // Match month and day, ignoring year (month is 0-indexed in Date)
+      return (month - 1) === date.getMonth() &&
+             day === date.getDate();
     });
   };
 
