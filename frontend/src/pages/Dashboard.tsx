@@ -21,26 +21,8 @@ const Dashboard = () => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editDisplayName, setEditDisplayName] = useState('');
   const fetchSeqRef = useRef(0);
-  const hasManuallyClockOutToday = useRef(false);
-  const lastClockOutDate = useRef<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  // Reset clock-out flag if it's a new day
-  useEffect(() => {
-    const today = new Date().toDateString();
-    const storedDate = localStorage.getItem('lastClockOutDate');
-    const storedFlag = localStorage.getItem('hasManuallyClockOutToday') === 'true';
-    
-    if (storedDate && storedDate !== today) {
-      hasManuallyClockOutToday.current = false;
-      localStorage.removeItem('hasManuallyClockOutToday');
-      localStorage.removeItem('lastClockOutDate');
-    } else if (storedFlag) {
-      hasManuallyClockOutToday.current = true;
-      lastClockOutDate.current = storedDate;
-    }
-  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -190,7 +172,7 @@ const Dashboard = () => {
 
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
     const fetchId = ++fetchSeqRef.current;
-    console.log('[Dashboard] Starting fetchActiveSession', { fetchId, userId, currentEmployeeId, email: user?.email, hasManuallyClockOutToday: hasManuallyClockOutToday.current });
+    console.log('[Dashboard] Starting fetchActiveSession', { fetchId, userId, currentEmployeeId, email: user?.email });
 
     const updateActiveSession = (session: any) => {
       if (fetchId < fetchSeqRef.current) {
@@ -206,8 +188,7 @@ const Dashboard = () => {
         ? 'https://work-timer-hub.vercel.app'
         : window.location.origin || 'https://work-timer-hub.vercel.app';
 
-    // Skip API call if user manually clocked out today
-    if (user?.email && !hasManuallyClockOutToday.current) {
+    if (user?.email) {
       try {
         const response = await fetch(
           `${baseUrl}/api/get-active-session?email=${encodeURIComponent(user.email)}`,
@@ -226,8 +207,6 @@ const Dashboard = () => {
       } catch (error) {
         console.error("Error calling get-active-session API:", error);
       }
-    } else if (hasManuallyClockOutToday.current) {
-      console.log('[Dashboard] Skipping API call - user manually clocked out today');
     }
 
     if (currentEmployeeId) {
@@ -465,11 +444,6 @@ const Dashboard = () => {
         title: "Clocked Out",
         description: "Your work session has ended",
       });
-      const today = new Date().toDateString();
-      hasManuallyClockOutToday.current = true;
-      lastClockOutDate.current = today;
-      localStorage.setItem('hasManuallyClockOutToday', 'true');
-      localStorage.setItem('lastClockOutDate', today);
       await fetchActiveSession(user.id, employeeId);
       setLoading(false);
       return;
@@ -510,11 +484,6 @@ const Dashboard = () => {
         title: "Clocked Out",
         description: "Your work session has ended",
       });
-      const today = new Date().toDateString();
-      hasManuallyClockOutToday.current = true;
-      lastClockOutDate.current = today;
-      localStorage.setItem('hasManuallyClockOutToday', 'true');
-      localStorage.setItem('lastClockOutDate', today);
       await fetchActiveSession(user.id, employeeId);
     }
     setLoading(false);
