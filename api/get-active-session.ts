@@ -8,7 +8,11 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const allowedHeaders =
+    typeof req.headers['access-control-request-headers'] === 'string'
+      ? req.headers['access-control-request-headers']
+      : 'Content-Type, Cache-Control';
+  res.setHeader('Access-Control-Allow-Headers', allowedHeaders);
   res.setHeader('Cache-Control', 'no-store, max-age=0');
 
   if (req.method === 'OPTIONS') {
