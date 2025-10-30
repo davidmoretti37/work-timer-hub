@@ -92,8 +92,57 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ success: false, error: latestError.message });
     }
 
-    console.log('[get-active-session] Fallback latest record:', { latestToday, email });
-    return res.status(200).json({ success: true, session: latestToday ?? null });
+    // If we found a Salesforce record, return it
+    if (latestToday) {
+      console.log('[get-active-session] Fallback latest record:', { latestToday, email });
+      return res.status(200).json({ success: true, session: latestToday });
+    }
+
+    // Final fallback: Check time_sessions for manual clock-ins
+    console.log('[get-active-session] No Salesforce record found, checking time_sessions for manual clock-ins');
+
+    try {
+      // Look up user by email
+      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+
+      if (authError) {
+        console.error('[get-active-session] Failed to list auth users:', authError);
+        return res.status(200).json({ success: true, session: null });
+      }
+
+      const user = authData?.users?.find(u => u.email?.toLowerCase() === email);
+
+      if (!user) {
+        console.log('[get-active-session] No auth user found for email:', email);
+        return res.status(200).json({ success: true, session: null });
+      }
+
+      // Check for active manual session (clock_out is null)
+      const { data: timeSession, error: timeSessionError } = await supabase
+        .from('time_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('clock_out', null)
+        .order('clock_in', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (timeSessionError) {
+        console.error('[get-active-session] Failed to fetch time_sessions:', timeSessionError);
+        return res.status(200).json({ success: true, session: null });
+      }
+
+      if (timeSession) {
+        console.log('[get-active-session] Found manual session:', { timeSession, email });
+        return res.status(200).json({ success: true, session: timeSession });
+      }
+
+      console.log('[get-active-session] No active session found in any table');
+      return res.status(200).json({ success: true, session: null });
+    } catch (manualCheckError: any) {
+      console.error('[get-active-session] Error checking manual sessions:', manualCheckError);
+      return res.status(200).json({ success: true, session: null });
+    }
   } catch (error: any) {
     console.error('[get-active-session] Unexpected error:', error);
     return res.status(500).json({ success: false, error: error?.message ?? 'Server error' });
