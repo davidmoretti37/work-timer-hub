@@ -119,9 +119,16 @@ export default function ReceiptAnalyzer({
 
       // Call the analyze-receipt API with timeout
       setProgress(60);
+      console.log('📤 Calling /api/analyze-receipt...');
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ Request timed out after 45 seconds');
+        controller.abort();
+      }, 45000); // 45 second timeout
+
+      console.log('🚀 Sending request to API...');
+      const startTime = Date.now();
 
       const response = await fetch("/api/analyze-receipt", {
         method: "POST",
@@ -132,10 +139,21 @@ export default function ReceiptAnalyzer({
         signal: controller.signal,
       });
 
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`✅ Response received in ${elapsed}s, status: ${response.status}`);
+
       clearTimeout(timeoutId);
       setProgress(80);
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error:', response.status, errorText);
+        throw new Error(`API returned ${response.status}: ${errorText}`);
+      }
+
+      console.log('📥 Parsing JSON response...');
       const result = await response.json();
+      console.log('✅ Parsed result:', result);
       setProgress(90);
 
       if (!result.success) {

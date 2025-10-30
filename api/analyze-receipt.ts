@@ -8,6 +8,7 @@ export const config = {
       sizeLimit: '10mb', // Allow up to 10MB for receipt images
     },
   },
+  maxDuration: 60, // Maximum execution time: 60 seconds (requires Vercel Pro)
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -29,25 +30,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    console.log('🔵 [API] Receipt analysis request received');
+    const startTime = Date.now();
+
     const { image } = req.body;
 
     if (!image) {
+      console.log('❌ [API] No image provided');
       return res.status(400).json({ error: 'No image provided' });
     }
 
     // Validate image format (base64 data URL)
     if (!image.startsWith('data:image/')) {
+      console.log('❌ [API] Invalid image format');
       return res.status(400).json({ error: 'Invalid image format. Expected base64 data URL' });
     }
 
-    console.log('Starting OCR analysis...');
+    const imageSize = (image.length * 0.75 / 1024).toFixed(2); // Approximate KB
+    console.log(`📊 [API] Image size: ~${imageSize} KB`);
+
+    console.log('🔧 [API] Initializing Tesseract worker...');
+    const workerStartTime = Date.now();
 
     // Initialize Tesseract worker with faster settings
     const worker = await createWorker('eng', 1, {
       logger: () => {}, // Disable logging for speed
     });
 
+    console.log(`✅ [API] Worker initialized in ${Date.now() - workerStartTime}ms`);
+
     // Set parameters for faster (but slightly less accurate) OCR
+    console.log('⚙️ [API] Configuring Tesseract parameters...');
     await worker.setParameters({
       tessedit_pageseg_mode: '1', // Automatic page segmentation with OSD
       tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz$.,/:-€£¥₹ ',
@@ -55,10 +68,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
       // Perform OCR on the image
+      console.log('🔍 [API] Starting OCR recognition...');
+      const ocrStartTime = Date.now();
+
       const { data } = await worker.recognize(image);
 
-      console.log('OCR completed. Confidence:', data.confidence);
-      console.log('Extracted text preview:', data.text.substring(0, 200));
+      const ocrDuration = ((Date.now() - ocrStartTime) / 1000).toFixed(2);
+      console.log(`✅ [API] OCR completed in ${ocrDuration}s`);
+      console.log(`📊 [API] OCR Confidence: ${data.confidence}%`);
+      console.log(`📝 [API] Extracted text preview: ${data.text.substring(0, 200)}`);
 
       if (!data.text || data.text.trim().length === 0) {
         await worker.terminate();
@@ -113,6 +131,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       await worker.terminate();
 
+      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`✅ [API] Total processing time: ${totalDuration}s`);
+
       // Return successfully parsed data
       return res.status(200).json({
         success: true,
@@ -139,10 +160,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw ocrError;
     }
   } catch (error: any) {
-    console.error('Receipt analysis error:', error);
+    console.error('❌ [API] Receipt analysis error:', error);
+    console.error('❌ [API] Error stack:', error.stack);
     return res.status(500).json({
       error: 'Failed to analyze receipt',
       message: error.message || 'An unexpected error occurred',
+      errorType: error.name,
       success: false,
     });
   }
