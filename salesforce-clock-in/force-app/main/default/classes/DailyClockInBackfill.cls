@@ -1,14 +1,11 @@
 public class DailyClockInBackfill implements Schedulable {
     public void execute(SchedulableContext sc) {
-        // Find users who have logged in today; for each, enqueue the same future call used by AutoClockIn
-        // We limit the scope to avoid hitting limits; scheduler runs periodically
-        Date today = Date.today();
-
-        // Query earliest login per user today
+        // Find earliest login per user for "today" (org timezone)
+        // Using date literal TODAY works with DateTime fields in SOQL
         List<AggregateResult> results = [
             SELECT UserId uid, MIN(LoginTime) firstLogin
             FROM LoginHistory
-            WHERE CALENDAR_DATE(LoginTime) = :today
+            WHERE LoginTime = TODAY
             GROUP BY UserId
             LIMIT 500
         ];
