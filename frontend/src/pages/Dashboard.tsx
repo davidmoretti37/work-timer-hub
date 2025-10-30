@@ -427,6 +427,18 @@ const Dashboard = () => {
         }
 
         toast({ title: 'Clocked Out', description: 'Your work session has ended' });
+
+        // Persist to time_sessions history for the user so records appear in history
+        try {
+          const nowIso = new Date().toISOString();
+          const clockInIso = activeSession.clock_in_time || activeSession.clock_in || nowIso;
+          await supabase
+            .from('time_sessions')
+            .insert({ user_id: user.id, clock_in: clockInIso, clock_out: nowIso });
+        } catch (e) {
+          console.error('Failed to persist time_sessions history:', e);
+        }
+
         await fetchActiveSession(user.id, employeeId);
       } catch (err: any) {
         console.error('[Clock Out] API failed:', err);
