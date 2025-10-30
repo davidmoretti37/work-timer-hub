@@ -404,48 +404,31 @@ const Dashboard = () => {
     // Handle Salesforce-managed clock-ins (clock_in_records)
     if (activeSession.source === "clock_in_records") {
       setLoading(true);
-      const clockOutTime = new Date().toISOString();
+      try {
+        const baseUrl =
+          typeof window !== 'undefined' && window.location.origin?.includes('localhost')
+            ? 'https://work-timer-hub.vercel.app'
+            : window.location.origin || 'https://work-timer-hub.vercel.app';
 
-      // If paused, finalize break duration before clocking out
-      let updateData: any = {
-        status: "clocked_out",
-        clock_out_time: clockOutTime,
-      };
-
-      if (activeSession.paused_at) {
-        const pausedAt = new Date(activeSession.paused_at);
-        const deltaSec = Math.max(0, Math.floor((Date.now() - pausedAt.getTime()) / 1000));
-        const newBreakSeconds = (activeSession.break_seconds || 0) + deltaSec;
-        updateData.break_seconds = newBreakSeconds;
-        updateData.paused_at = null;
-      }
-
-      console.log('[Clock Out] Updating clock_in_records:', { id: activeSession.id, updateData });
-      const { error, data } = await supabase
-        .from("clock_in_records")
-        .update(updateData)
-        .eq("id", activeSession.id)
-        .select();
-
-      console.log('[Clock Out] Update result:', { error, data });
-
-      if (error) {
-        console.error('[Clock Out] Update failed:', error);
-        toast({
-          title: "Error",
-          description: "Failed to clock out",
-          variant: "destructive",
+        const response = await fetch(`${baseUrl}/api/clock-out`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: user.email }),
         });
-        setLoading(false);
-        return;
-      }
 
-      toast({
-        title: "Clocked Out",
-        description: "Your work session has ended",
-      });
-      await fetchActiveSession(user.id, employeeId);
-      setLoading(false);
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || 'Failed to clock out');
+        }
+
+        toast({ title: 'Clocked Out', description: 'Your work session has ended' });
+        await fetchActiveSession(user.id, employeeId);
+      } catch (err: any) {
+        console.error('[Clock Out] API failed:', err);
+        toast({ title: 'Error', description: err?.message || 'Failed to clock out', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 

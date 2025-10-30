@@ -129,7 +129,7 @@ export default function ExpenseReimbursementForm({
       paymentMethod: "",
       isAnalyzed: false,
     };
-    setExpenses([...expenses, newExpense]);
+    setExpenses(prev => [...prev, newExpense]);
     setCurrentExpenseId(newExpense.id);
   };
 
