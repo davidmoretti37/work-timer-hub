@@ -1,4 +1,3 @@
-import { createWorker } from 'tesseract.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { parseReceiptText, isValidParsedReceipt, getOverallConfidence } from './utils/receiptParser';
 
@@ -8,7 +7,6 @@ export const config = {
       sizeLimit: '10mb', // Allow up to 10MB for receipt images
     },
   },
-  maxDuration: 60, // Maximum execution time: 60 seconds (requires Vercel Pro)
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -49,116 +47,114 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const imageSize = (image.length * 0.75 / 1024).toFixed(2); // Approximate KB
     console.log(`📊 [API] Image size: ~${imageSize} KB`);
 
-    console.log('🔧 [API] Initializing Tesseract worker...');
-    const workerStartTime = Date.now();
+    // Use OCR.space API (free tier, faster than Tesseract)
+    console.log('🔍 [API] Calling OCR.space API...');
+    const ocrStartTime = Date.now();
 
-    // Initialize Tesseract worker with faster settings
-    const worker = await createWorker('eng', 1, {
-      logger: () => {}, // Disable logging for speed
+    // OCR.space free API key (no signup required for testing)
+    const OCR_API_KEY = process.env.OCR_SPACE_API_KEY || 'K87899142388957';
+
+    const formData = new URLSearchParams();
+    formData.append('base64Image', image);
+    formData.append('language', 'eng');
+    formData.append('isOverlayRequired', 'false');
+    formData.append('detectOrientation', 'true');
+    formData.append('scale', 'true');
+    formData.append('OCREngine', '2'); // Engine 2 is faster
+
+    const ocrResponse = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      headers: {
+        'apikey': OCR_API_KEY,
+      },
+      body: formData,
     });
 
-    console.log(`✅ [API] Worker initialized in ${Date.now() - workerStartTime}ms`);
+    const ocrResult = await ocrResponse.json();
+    const ocrDuration = ((Date.now() - ocrStartTime) / 1000).toFixed(2);
+    console.log(`✅ [API] OCR completed in ${ocrDuration}s`);
 
-    // Set parameters for faster (but slightly less accurate) OCR
-    console.log('⚙️ [API] Configuring Tesseract parameters...');
-    await worker.setParameters({
-      tessedit_pageseg_mode: '1', // Automatic page segmentation with OSD
-      tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz$.,/:-€£¥₹ ',
+    if (!ocrResult.ParsedResults || ocrResult.ParsedResults.length === 0) {
+      console.log('❌ [API] No text detected');
+      return res.status(400).json({
+        error: 'No text detected in image',
+        message: 'Please upload a clearer image of your receipt',
+        success: false,
+      });
+    }
+
+    const extractedText = ocrResult.ParsedResults[0].ParsedText;
+    console.log(`📝 [API] Extracted text preview: ${extractedText.substring(0, 200)}`);
+
+    if (!extractedText || extractedText.trim().length === 0) {
+      return res.status(400).json({
+        error: 'No text detected in image',
+        message: 'Please upload a clearer image of your receipt',
+        success: false,
+      });
+    }
+
+    // Parse the extracted text
+    const parsed = parseReceiptText(extractedText);
+    const overallConfidence = getOverallConfidence(parsed);
+
+    console.log('Parsed data:', {
+      amount: parsed.amount,
+      currency: parsed.currency,
+      vendor: parsed.vendorName,
+      date: parsed.date,
+      confidence: overallConfidence,
     });
 
-    try {
-      // Perform OCR on the image
-      console.log('🔍 [API] Starting OCR recognition...');
-      const ocrStartTime = Date.now();
+    // Validate the parsed data
+    if (!isValidParsedReceipt(parsed)) {
+      return res.status(400).json({
+        error: 'Could not extract required information',
+        message: 'Unable to find the total amount. Please upload a clearer receipt or enter manually.',
+        success: false,
+        partialData: {
+          text: extractedText,
+          parsed,
+        },
+      });
+    }
 
-      const { data } = await worker.recognize(image);
+    // Check confidence threshold
+    if (overallConfidence < 40) {
+      return res.status(400).json({
+        error: 'Low confidence in extracted data',
+        message: 'The image quality is too low. Please upload a clearer photo.',
+        success: false,
+        confidence: overallConfidence,
+        partialData: {
+          text: extractedText,
+          parsed,
+        },
+      });
+    }
 
-      const ocrDuration = ((Date.now() - ocrStartTime) / 1000).toFixed(2);
-      console.log(`✅ [API] OCR completed in ${ocrDuration}s`);
-      console.log(`📊 [API] OCR Confidence: ${data.confidence}%`);
-      console.log(`📝 [API] Extracted text preview: ${data.text.substring(0, 200)}`);
+    const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ [API] Total processing time: ${totalDuration}s`);
 
-      if (!data.text || data.text.trim().length === 0) {
-        await worker.terminate();
-        return res.status(400).json({
-          error: 'No text detected in image',
-          message: 'Please upload a clearer image of your receipt',
-          success: false,
-        });
-      }
-
-      // Parse the extracted text
-      const parsed = parseReceiptText(data.text);
-      const overallConfidence = getOverallConfidence(parsed);
-
-      console.log('Parsed data:', {
+    // Return successfully parsed data
+    return res.status(200).json({
+      success: true,
+      data: {
         amount: parsed.amount,
         currency: parsed.currency,
-        vendor: parsed.vendorName,
         date: parsed.date,
-        confidence: overallConfidence,
-      });
-
-      // Validate the parsed data
-      if (!isValidParsedReceipt(parsed)) {
-        await worker.terminate();
-        return res.status(400).json({
-          error: 'Could not extract required information',
-          message: 'Unable to find the total amount. Please upload a clearer receipt or enter manually.',
-          success: false,
-          partialData: {
-            text: data.text,
-            parsed,
-            ocrConfidence: data.confidence,
-          },
-        });
-      }
-
-      // Check confidence threshold
-      if (overallConfidence < 40) {
-        await worker.terminate();
-        return res.status(400).json({
-          error: 'Low confidence in extracted data',
-          message: 'The image quality is too low. Please upload a clearer photo.',
-          success: false,
-          confidence: overallConfidence,
-          partialData: {
-            text: data.text,
-            parsed,
-          },
-        });
-      }
-
-      await worker.terminate();
-
-      const totalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
-      console.log(`✅ [API] Total processing time: ${totalDuration}s`);
-
-      // Return successfully parsed data
-      return res.status(200).json({
-        success: true,
-        data: {
-          amount: parsed.amount,
-          currency: parsed.currency,
-          date: parsed.date,
-          vendorName: parsed.vendorName,
-          paymentMethod: parsed.paymentMethod,
-        },
-        confidence: {
-          overall: overallConfidence,
-          amount: parsed.confidence.amount,
-          date: parsed.confidence.date,
-          vendor: parsed.confidence.vendor,
-          payment: parsed.confidence.payment,
-        },
-        rawText: data.text.substring(0, 500), // Include snippet for debugging
-        ocrConfidence: data.confidence,
-      });
-    } catch (ocrError: any) {
-      console.error('OCR error:', ocrError);
-      await worker.terminate();
-      throw ocrError;
-    }
+        vendorName: parsed.vendorName,
+        paymentMethod: parsed.paymentMethod,
+      },
+      confidence: {
+        overall: overallConfidence,
+        amount: parsed.confidence.amount,
+        date: parsed.confidence.date,
+        vendor: parsed.confidence.vendor,
+        payment: parsed.confidence.payment,
+      },
+      rawText: extractedText.substring(0, 500), // Include snippet for debugging
+    });
   } catch (error: any) {
     console.error('❌ [API] Receipt analysis error:', error);
     console.error('❌ [API] Error stack:', error.stack);
