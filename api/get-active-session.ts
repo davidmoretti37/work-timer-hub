@@ -71,8 +71,29 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ success: false, error: recordError.message });
     }
 
-    console.log('[get-active-session] Found record:', { record, email });
-    return res.status(200).json({ success: true, session: record ?? null });
+    if (record) {
+      console.log('[get-active-session] Found active record:', { record, email });
+      return res.status(200).json({ success: true, session: record });
+    }
+
+    // Fallback: return the latest record for today even if already clocked out
+    const { data: latestToday, error: latestError } = await supabase
+      .from('clock_in_records')
+      .select('id, employee_id, clock_in_time, status, clock_out_time')
+      .eq('employee_id', employee.id)
+      .gte('clock_in_time', today.toISOString())
+      .lt('clock_in_time', tomorrow.toISOString())
+      .order('clock_in_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestError) {
+      console.error('[get-active-session] Failed to fetch latest record for fallback:', latestError);
+      return res.status(500).json({ success: false, error: latestError.message });
+    }
+
+    console.log('[get-active-session] Fallback latest record:', { latestToday, email });
+    return res.status(200).json({ success: true, session: latestToday ?? null });
   } catch (error: any) {
     console.error('[get-active-session] Unexpected error:', error);
     return res.status(500).json({ success: false, error: error?.message ?? 'Server error' });
