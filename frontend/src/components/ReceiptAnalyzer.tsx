@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,12 @@ export default function ReceiptAnalyzer({
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
+
+  // Sync internal state with existingData prop when it changes
+  useEffect(() => {
+    setAnalysisResult(existingData || null);
+    setError(null);
+  }, [existingData]);
 
   const compressImage = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
