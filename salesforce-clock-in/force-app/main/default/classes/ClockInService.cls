@@ -15,7 +15,7 @@ public class ClockInService {
             req.setEndpoint('callout:Work_Timer_Hub_API/api/salesforce-clock-in');
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
-
+            
             Map<String, Object> body = new Map<String, Object>();
             body.put('email', userEmail);
             if (loginTime != null) {
@@ -23,7 +23,7 @@ public class ClockInService {
             }
 
             req.setBody(JSON.serialize(body));
-
+            
             Http http = new Http();
             HttpResponse res = http.send(req);
             

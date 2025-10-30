@@ -246,6 +246,41 @@ const Dashboard = () => {
         updateActiveSession({ ...clockInRecord, source: "clock_in_records" });
         return;
       }
+
+      // If there is no active record, check if a completed record exists today and backfill time_sessions
+      const { data: latestToday } = await supabase
+        .from("clock_in_records")
+        .select("*")
+        .eq("employee_id", currentEmployeeId)
+        .gte("clock_in_time", today.toISOString())
+        .lt("clock_in_time", tomorrow.toISOString())
+        .order("clock_in_time", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestToday && latestToday.status === 'clocked_out') {
+        // Persist a historical time session if none exists
+        try {
+          const { data: existingSession } = await supabase
+            .from("time_sessions")
+            .select("*")
+            .eq("user_id", userId)
+            .gte("clock_in", today.toISOString())
+            .lt("clock_in", tomorrow.toISOString())
+            .limit(1)
+            .maybeSingle();
+
+          if (!existingSession) {
+            await supabase.from("time_sessions").insert({
+              user_id: userId,
+              clock_in: latestToday.clock_in_time,
+              clock_out: latestToday.clock_out_time || new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          console.error('[Dashboard] Failed to backfill time_sessions from clock_in_records:', e);
+        }
+      }
     }
 
     const { data: timeSession, error: timeSessionError } = await supabase
