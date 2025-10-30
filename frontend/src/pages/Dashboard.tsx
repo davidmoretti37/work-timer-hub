@@ -198,7 +198,12 @@ const Dashboard = () => {
           const result = await response.json();
           console.log('[Dashboard] API response', { fetchId, result });
           if (result.success && result.session) {
-            updateActiveSession({ ...result.session, source: "clock_in_records" });
+            // If API falls back to latest record but it's already clocked_out, treat as no active session
+            if (result.session.status && result.session.status === 'clocked_out') {
+              updateActiveSession(null);
+            } else {
+              updateActiveSession({ ...result.session, source: "clock_in_records" });
+            }
             return;
           }
         } else {
