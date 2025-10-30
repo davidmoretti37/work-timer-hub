@@ -19,6 +19,7 @@ const Admin = () => {
   const [user, setUser] = useState<any>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Map<string, any>>(new Map());
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [isAdmin, setIsAdmin] = useState(false);
   const [profileCreationAttempted, setProfileCreationAttempted] = useState<Set<string>>(new Set());
   const [userFilters, setUserFilters] = useState<Map<string, { period: string; customStart?: Date; customEnd?: Date }>>(new Map());
@@ -139,6 +140,25 @@ const Admin = () => {
 
     await fetchEmployeeActivity();
   };
+
+  // Keep selected users in sync with available users; default to all
+  useEffect(() => {
+    const allUserIds = new Set(sessions.map(s => s.user_id));
+    // If nothing selected yet, or new users appeared, include them
+    if (selectedUserIds.size === 0) {
+      setSelectedUserIds(allUserIds);
+      return;
+    }
+    let changed = false;
+    const next = new Set(selectedUserIds);
+    for (const id of allUserIds) {
+      if (!next.has(id)) {
+        next.add(id);
+        changed = true;
+      }
+    }
+    if (changed) setSelectedUserIds(next);
+  }, [sessions]);
 
   const fetchEmployeeActivity = async () => {
     try {
@@ -654,6 +674,7 @@ const Admin = () => {
   }
 
   const uniqueUserIds = [...new Set(sessions.map(s => s.user_id))];
+  const filteredUserIds = uniqueUserIds.filter(id => selectedUserIds.has(id));
 
   return (
     <div className="min-h-screen">
@@ -670,32 +691,48 @@ const Admin = () => {
           </div>
 
 
-          <Tabs defaultValue="all" className="w-full">
-            <TabsList>
-              <TabsTrigger value="all">All Sessions</TabsTrigger>
-              <TabsTrigger value="users">By User</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="all" className="space-y-4 mt-6">
-              {sessions.map((session) => (
-                <SessionCard
-                  key={session.id}
-                  clockIn={session.clock_in}
-                  clockOut={session.clock_out}
-                  hoursWorked={session.hours_worked}
-                  userName={profiles.get(session.user_id)?.full_name}
-                  sessionId={session.id}
-                  isAdmin={true}
-                  onUpdate={handleUpdateSession}
-                  onDelete={handleDeleteSession}
-                  pausedAt={session.paused_at}
-                  breakSeconds={session.break_seconds}
-                  breakEnd={session.break_end}
-                />
-              ))}
-            </TabsContent>
-            
-            <TabsContent value="users" className="space-y-6 mt-6">
+          <div className="space-y-6 mt-6">
+              {/* User visibility selector */}
+              <Card className="container-shadow">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Visible Users</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedUserIds(new Set(uniqueUserIds))}
+                    >
+                      Select All
+                    </Button>
+                  </CardTitle>
+                  <CardDescription>Toggle which users to display below. New employees appear automatically.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {uniqueUserIds.map((id) => {
+                      const profile = profiles.get(id);
+                      const name = profile?.admin_display_name || profile?.full_name || 'Unknown User';
+                      const checked = selectedUserIds.has(id);
+                      return (
+                        <label key={id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/30 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={checked}
+                            onChange={(e) => {
+                              const next = new Set(selectedUserIds);
+                              if (e.target.checked) next.add(id); else next.delete(id);
+                              setSelectedUserIds(next);
+                            }}
+                          />
+                          <span className="text-sm">{name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className="container-shadow">
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
@@ -749,7 +786,7 @@ const Admin = () => {
                   )}
                 </CardContent>
               </Card>
-              {uniqueUserIds.map((userId) => {
+              {filteredUserIds.map((userId) => {
                 const profile = profiles.get(userId);
                 const stats = calculateFilteredUserStats(userId);
                 const currentFilter = userFilters.get(userId);
@@ -923,8 +960,7 @@ const Admin = () => {
                   </Card>
                 );
               })}
-            </TabsContent>
-          </Tabs>
+          </div>
         </div>
       </main>
     </div>

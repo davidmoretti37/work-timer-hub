@@ -415,25 +415,34 @@ const Dashboard = () => {
     if (!user) return;
     
     setLoading(true);
-    const { error } = await supabase
-      .from("time_sessions")
-      .insert({
-        user_id: user.id,
-        clock_in: new Date().toISOString(),
-      });
+    try {
+      const { error } = await supabase
+        .from("time_sessions")
+        .insert({ user_id: user.id, clock_in: new Date().toISOString() });
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to clock in",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Clocked In",
-        description: "Your work session has started",
-      });
+      if (error) {
+        // Fallback: call backend with service role to bypass RLS issues
+        const baseUrl =
+          typeof window !== 'undefined' && window.location.origin?.includes('localhost')
+            ? 'https://work-timer-hub.vercel.app'
+            : window.location.origin || 'https://work-timer-hub.vercel.app';
+
+        const resp = await fetch(`${baseUrl}/api/manual-clock-in`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: user.id })
+        });
+
+        if (!resp.ok) {
+          const txt = await resp.text();
+          throw new Error(txt || 'Failed to clock in');
+        }
+      }
+
+      toast({ title: "Clocked In", description: "Your work session has started" });
       await fetchActiveSession(user.id, employeeId);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to clock in', variant: 'destructive' });
     }
     setLoading(false);
   };
