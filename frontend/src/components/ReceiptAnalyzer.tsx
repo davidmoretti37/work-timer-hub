@@ -38,7 +38,52 @@ export default function ReceiptAnalyzer({
     existingData || null
   );
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   const { toast } = useToast();
+
+  const compressImage = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Create canvas with max dimensions
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+
+          let width = img.width;
+          let height = img.height;
+
+          // Scale down if needed
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx!.drawImage(img, 0, 0, width, height);
+
+          // Compress to JPEG at 0.8 quality
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
   const handleFileUpload = async (file: File) => {
     // Validate file type
@@ -64,21 +109,34 @@ export default function ReceiptAnalyzer({
 
     setIsAnalyzing(true);
     setError(null);
+    setProgress(10);
 
     try {
-      // Convert image to base64
-      const base64Image = await fileToBase64(file);
+      // Compress image for faster upload/processing
+      setProgress(20);
+      const base64Image = await compressImage(file);
+      setProgress(40);
 
-      // Call the analyze-receipt API
+      // Call the analyze-receipt API with timeout
+      setProgress(60);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+
       const response = await fetch("/api/analyze-receipt", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ image: base64Image }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+      setProgress(80);
+
       const result = await response.json();
+      setProgress(90);
 
       if (!result.success) {
         setError(result.message || result.error || "Failed to analyze receipt");
@@ -110,6 +168,7 @@ export default function ReceiptAnalyzer({
 
       setAnalysisResult(analyzedData);
       onAnalysisComplete(analyzedData);
+      setProgress(100);
 
       toast({
         title: "Receipt Analyzed Successfully",
@@ -120,14 +179,25 @@ export default function ReceiptAnalyzer({
       });
     } catch (err: any) {
       console.error("Receipt analysis error:", err);
-      setError(err.message || "An unexpected error occurred");
-      toast({
-        title: "Analysis Error",
-        description: "Failed to analyze receipt. Please try again.",
-        variant: "destructive",
-      });
+
+      if (err.name === 'AbortError') {
+        setError("Analysis is taking too long. Please try a clearer image or try again.");
+        toast({
+          title: "Timeout",
+          description: "Receipt analysis took too long. Please try a clearer photo.",
+          variant: "destructive",
+        });
+      } else {
+        setError(err.message || "An unexpected error occurred");
+        toast({
+          title: "Analysis Error",
+          description: "Failed to analyze receipt. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsAnalyzing(false);
+      setProgress(0);
     }
   };
 
@@ -234,7 +304,19 @@ export default function ReceiptAnalyzer({
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <p className="text-lg font-medium">Analyzing Receipt...</p>
               <p className="text-sm text-muted-foreground">
-                Extracting text and parsing data
+                {progress < 40 && "Compressing image..."}
+                {progress >= 40 && progress < 60 && "Uploading..."}
+                {progress >= 60 && progress < 90 && "Extracting text with OCR..."}
+                {progress >= 90 && "Almost done..."}
+              </p>
+              <div className="w-full max-w-xs bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This may take 10-30 seconds
               </p>
             </div>
           )}

@@ -42,8 +42,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Starting OCR analysis...');
 
-    // Initialize Tesseract worker
-    const worker = await createWorker('eng');
+    // Initialize Tesseract worker with faster settings
+    const worker = await createWorker('eng', 1, {
+      logger: () => {}, // Disable logging for speed
+    });
+
+    // Set parameters for faster (but slightly less accurate) OCR
+    await worker.setParameters({
+      tessedit_pageseg_mode: '1', // Automatic page segmentation with OSD
+      tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz$.,/:-€£¥₹ ',
+    });
 
     try {
       // Perform OCR on the image
