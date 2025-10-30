@@ -33,38 +33,54 @@ export function parseReceiptText(text: string): ParsedReceipt {
 /**
  * Extracts the total amount from receipt text
  * Looks for keywords like TOTAL, AMOUNT, SUBTOTAL near numbers
+ * Supports both US (1,234.56) and European (1.234,56) formats
  */
 function extractAmount(text: string): number | null {
   // Normalize text
   const normalizedText = text.toUpperCase();
 
-  // Patterns to find total amount
+  // Patterns to find total amount (both . and , as decimal)
   const totalPatterns = [
-    /(?:TOTAL|AMOUNT\s+DUE|BALANCE|GRAND\s+TOTAL|AMOUNT|SUBTOTAL)[:\s]*([£$€¥₹R\$]?\s*[\d,]+\.?\d{0,2})/i,
-    /([£$€¥₹R\$]?\s*[\d,]+\.\d{2})\s*(?:TOTAL|AMOUNT\s+DUE)/i,
+    // Standard patterns with period decimal
+    /(?:TOTAL|AMOUNT\s+DUE|BALANCE|GRAND\s+TOTAL|AMOUNT|SUBTOTAL)[:\s]*([£$€¥₹R\$]?\s*[\d.,]+)/i,
+    /([£$€¥₹R\$]?\s*[\d.,]+)\s*(?:USD|EUR|GBP|BRL|TOTAL|AMOUNT)/i,
   ];
 
   for (const pattern of totalPatterns) {
     const match = normalizedText.match(pattern);
     if (match) {
-      const amountStr = match[1].replace(/[£$€¥₹R\$,\s]/g, '');
+      let amountStr = match[1].replace(/[£$€¥₹R\$\s]/g, '');
+
+      // Detect format: if last separator is comma, it's European format
+      const lastComma = amountStr.lastIndexOf(',');
+      const lastPeriod = amountStr.lastIndexOf('.');
+
+      if (lastComma > lastPeriod) {
+        // European format: 1.234,56 -> remove dots, replace comma with period
+        amountStr = amountStr.replace(/\./g, '').replace(',', '.');
+      } else {
+        // US format: 1,234.56 -> just remove commas
+        amountStr = amountStr.replace(/,/g, '');
+      }
+
       const amount = parseFloat(amountStr);
-      if (!isNaN(amount) && amount > 0) {
+      if (!isNaN(amount) && amount > 0 && amount < 1000000) {
         return amount;
       }
     }
   }
 
-  // Fallback: Find the largest number in the text (likely the total)
-  const numbers = text.match(/[\d,]+\.\d{2}/g);
-  if (numbers && numbers.length > 0) {
-    const amounts = numbers
-      .map(n => parseFloat(n.replace(/,/g, '')))
-      .filter(n => !isNaN(n) && n > 0);
+  // Fallback: Find numbers with both formats
+  const usNumbers = text.match(/[\d,]+\.\d{2}/g) || [];
+  const euNumbers = text.match(/[\d.]+,\d{2}/g) || [];
 
-    if (amounts.length > 0) {
-      return Math.max(...amounts);
-    }
+  const allNumbers = [
+    ...usNumbers.map(n => parseFloat(n.replace(/,/g, ''))),
+    ...euNumbers.map(n => parseFloat(n.replace(/\./g, '').replace(',', '.')))
+  ].filter(n => !isNaN(n) && n > 0 && n < 1000000);
+
+  if (allNumbers.length > 0) {
+    return Math.max(...allNumbers);
   }
 
   return null;
@@ -107,9 +123,11 @@ function extractDate(text: string): Date | null {
     // YYYY-MM-DD
     /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/,
     // Month DD, YYYY (e.g., "Jan 15, 2024")
-    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{1,2}),?\s+(\d{4})/i,
-    // DD Month YYYY (e.g., "15 January 2024")
-    /(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(\d{4})/i,
+    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Janeiro|Fevereiro|Março|Abril|Maio|Junho|Julho|Agosto|Setembro|Outubro|Novembro|Dezembro)[a-z]*\s+(\d{1,2}),?\s+(\d{4})/i,
+    // DD Month YYYY (e.g., "15 January 2024" or "2 de outubro de 2025")
+    /(\d{1,2})\s+(?:de\s+)?(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Janeiro|Fevereiro|Março|Abril|Maio|Junho|Julho|Agosto|Setembro|Outubro|Novembro|Dezembro)[a-z]*\s+(?:de\s+)?(\d{4})/i,
+    // "DD de MONTH de YYYY" (Portuguese)
+    /(\d{1,2})\s+de\s+([a-z]+)\s+de\s+(\d{4})/i,
   ];
 
   for (const pattern of datePatterns) {
