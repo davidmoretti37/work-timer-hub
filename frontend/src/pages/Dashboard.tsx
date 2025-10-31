@@ -414,9 +414,26 @@ const Dashboard = () => {
 
   const handleClockIn = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
+      // First check if there's already an active session
+      const { data: existingSession } = await supabase
+        .from("time_sessions")
+        .select("*")
+        .eq("user_id", user.id)
+        .is("clock_out", null)
+        .order("clock_in", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingSession) {
+        toast({ title: "Already Clocked In", description: "You already have an active session", variant: "destructive" });
+        setLoading(false);
+        return;
+      }
+
+      // Try to insert directly first
       const { error } = await supabase
         .from("time_sessions")
         .insert({ user_id: user.id, clock_in: new Date().toISOString() });
