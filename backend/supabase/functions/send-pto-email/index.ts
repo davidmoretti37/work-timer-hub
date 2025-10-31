@@ -93,12 +93,11 @@ serve(async (req) => {
       </div>
     `
 
-    // TEMPORARY: Send to davidmoretti37@gmail.com for testing
-    // Forward these emails to accounting@baycoaviation.com manually
+    // Send to both fbayma@baycoaviation.com and accounting@baycoaviation.com
     const { data, error } = await resend.emails.send({
       from: 'PTO System <onboarding@resend.dev>',
-      to: ['davidmoretti37@gmail.com'],
-      subject: `PTO Request - ${ptoData.employee_name} (Forward to Accounting)`,
+      to: ['fbayma@baycoaviation.com', 'accounting@baycoaviation.com'],
+      subject: `PTO Request - ${ptoData.employee_name}`,
       html: emailHtml,
     })
 
