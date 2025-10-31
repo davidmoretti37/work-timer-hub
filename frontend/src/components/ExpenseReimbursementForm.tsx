@@ -447,47 +447,52 @@ export default function ExpenseReimbursementForm({
 
       setIsUploading(false);
 
-      // Send email notification
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await supabase.functions.invoke('send-expense-email', {
-            body: {
-              expenseData: {
-                employee_name: employeeName,
-                confirmation_email: confirmationEmail,
-                department: department,
-                supervisor_name: supervisorName,
-                payment_method: paymentMethod,
-                total_amount_usd: calculateGrandTotal(),
-                employee_signature: employeeSignature,
-                employee_certified: employeeCertified,
-                submission_date: reimbursement.submission_date,
-                expense_items: expenses.map(exp => ({
-                  expense_date: exp.expenseDate?.toISOString(),
-                  vendor_name: exp.vendorName,
-                  description: exp.description,
-                  category: exp.category,
-                  currency: exp.currency,
-                  amount: exp.amount,
-                  amount_usd: exp.amountUSD,
-                  notes: exp.notes,
-                })),
-              },
-            },
-          });
-        }
-      } catch (emailError) {
-        console.error('Failed to send email notification:', emailError);
-        // Don't fail the whole submission if email fails
-      }
+      // Open Gmail to send expense notification
+      const subject = `Expense Reimbursement Request - ${employeeName}`;
+      const expenseDetails = expenses.map((exp, index) =>
+        `Item ${index + 1}:
+- Date: ${exp.expenseDate ? format(exp.expenseDate, "MM/dd/yyyy") : "N/A"}
+- Vendor: ${exp.vendorName}
+- Description: ${exp.description}
+- Category: ${exp.category || "N/A"}
+- Amount: ${exp.currency} ${exp.amount} (USD $${exp.amountUSD.toFixed(2)})
+${exp.notes ? `- Notes: ${exp.notes}` : ""}`
+      ).join('\n\n');
+
+      const body = `
+New Expense Reimbursement Request Submitted:
+
+EMPLOYEE INFORMATION:
+Name: ${employeeName}
+Email: ${confirmationEmail}
+${department ? `Department: ${department}` : ""}
+${supervisorName ? `Supervisor: ${supervisorName}` : ""}
+
+REIMBURSEMENT SUMMARY:
+Total Amount (USD): $${calculateGrandTotal().toFixed(2)}
+Payment Method: ${paymentMethod === "payroll" ? "Payroll" : "Bank Transfer"}
+Number of Expenses: ${expenses.length}
+
+EXPENSE ITEMS:
+${expenseDetails}
+
+EMPLOYEE CERTIFICATION:
+Employee has digitally signed and certified this request.
+
+Submitted: ${new Date().toLocaleString()}
+
+Please review this expense reimbursement request in the admin panel.
+      `.trim();
+
+      const emailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=accounting@baycoaviation.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      window.open(emailUrl, '_blank');
 
       toast({
         title: "Expense Reimbursement Submitted",
         description: `Your request for ${formatCurrency(
           calculateGrandTotal(),
           "USD"
-        )} has been submitted successfully. Confirmation will be sent to ${confirmationEmail}`,
+        )} has been submitted successfully. Please send the email that opened.`,
       });
 
       // Reset form

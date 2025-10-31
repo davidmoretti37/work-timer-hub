@@ -290,7 +290,7 @@ Click one of the links above to approve or reject this request.
     
     // ALWAYS use Gmail (it works better than Outlook web)
     // Users can add their Outlook email to Gmail and send from any address
-    const emailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=fbayma@baycoaviation.com&cc=accounting@baycoaviation.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const emailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=fbayma@baycoaviation.com,accounting@baycoaviation.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
     window.open(emailUrl, '_blank');
   };
