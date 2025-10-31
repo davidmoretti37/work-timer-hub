@@ -93,11 +93,11 @@ export default function ReceiptAnalyzer({
 
   const handleFileUpload = async (file: File) => {
     // Validate file type
-    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "application/pdf"];
     if (!validTypes.includes(file.type)) {
       toast({
         title: "Invalid File Type",
-        description: "Please upload a JPG, PNG, or WEBP image",
+        description: "Please upload a JPG, PNG, WEBP image, or PDF",
         variant: "destructive",
       });
       return;
@@ -118,9 +118,11 @@ export default function ReceiptAnalyzer({
     setProgress(10);
 
     try {
-      // Compress image for faster upload/processing
+      // For images, compress; for PDFs, convert directly to base64
       setProgress(20);
-      const base64Image = await compressImage(file);
+      const base64Data = file.type === "application/pdf"
+        ? await fileToBase64(file)
+        : await compressImage(file);
       setProgress(40);
 
       // Call the analyze-receipt API with timeout
@@ -141,7 +143,7 @@ export default function ReceiptAnalyzer({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ image: base64Image }),
+        body: JSON.stringify({ image: base64Data }),
         signal: controller.signal,
       });
 
@@ -296,7 +298,7 @@ export default function ReceiptAnalyzer({
           <input
             type="file"
             id="receipt-upload-input"
-            accept="image/jpeg,image/jpg,image/png,image/webp"
+            accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
             onChange={handleFileInputChange}
             style={{ display: 'none' }}
             disabled={isAnalyzing}
@@ -307,7 +309,7 @@ export default function ReceiptAnalyzer({
               <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
               <p className="text-lg font-medium mb-2">Upload Receipt for Auto-Fill</p>
               <p className="text-sm text-muted-foreground mb-4">
-                Click to browse or drag and drop an image here
+                Click to browse or drag and drop a file here
               </p>
               <Button
                 type="button"
@@ -317,10 +319,10 @@ export default function ReceiptAnalyzer({
                   triggerFileInput();
                 }}
               >
-                Choose Image
+                Choose File
               </Button>
               <p className="text-xs text-muted-foreground mt-3">
-                Supports: JPG, PNG, WEBP (max 10MB)
+                Supports: JPG, PNG, WEBP, PDF (max 10MB)
               </p>
             </div>
           ) : (
@@ -328,7 +330,7 @@ export default function ReceiptAnalyzer({
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <p className="text-lg font-medium">Analyzing Receipt...</p>
               <p className="text-sm text-muted-foreground">
-                {progress < 40 && "Compressing image..."}
+                {progress < 40 && "Processing file..."}
                 {progress >= 40 && progress < 60 && "Uploading..."}
                 {progress >= 60 && progress < 90 && "Extracting text with OCR..."}
                 {progress >= 90 && "Almost done..."}
