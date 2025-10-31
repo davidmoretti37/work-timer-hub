@@ -573,15 +573,27 @@ export default function ExpenseReimbursementForm({
             {expenses.filter(e => e.isAnalyzed).map((expense, index) => (
               <Card key={expense.id} className="p-4 bg-muted/30">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold">
                       {index + 1}
                     </div>
-                    <div>
-                      <div className="font-semibold">{expense.vendorName || "Unnamed Vendor"}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {expense.expenseDate ? format(expense.expenseDate, "MMM dd, yyyy") : "No date"}
-                      </div>
+                    <div className="flex-1">
+                      <Input
+                        value={expense.vendorName || ""}
+                        onChange={(e) =>
+                          updateExpense(expense.id, "vendorName", e.target.value)
+                        }
+                        placeholder="Vendor name"
+                        className="font-semibold h-8 mb-1"
+                      />
+                      <Input
+                        type="date"
+                        value={expense.expenseDate ? format(expense.expenseDate, "yyyy-MM-dd") : ""}
+                        onChange={(e) =>
+                          updateExpense(expense.id, "expenseDate", e.target.value ? new Date(e.target.value) : null)
+                        }
+                        className="text-sm h-7"
+                      />
                     </div>
                   </div>
                   <Button
@@ -614,8 +626,16 @@ export default function ExpenseReimbursementForm({
                   </div>
 
                   <div>
-                    <Label className="text-xs">Payment Method</Label>
-                    <div className="text-sm">{expense.paymentMethod || "Not detected"}</div>
+                    <Label htmlFor={`payment-${expense.id}`} className="text-xs">Payment Method</Label>
+                    <Input
+                      id={`payment-${expense.id}`}
+                      value={expense.paymentMethod || ""}
+                      onChange={(e) =>
+                        updateExpense(expense.id, "paymentMethod", e.target.value)
+                      }
+                      placeholder="Payment method"
+                      className="mt-1"
+                    />
                   </div>
 
                   <div>
