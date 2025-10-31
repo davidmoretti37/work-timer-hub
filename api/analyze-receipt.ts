@@ -4,7 +4,7 @@ import { parseReceiptText, isValidParsedReceipt, getOverallConfidence } from './
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb', // Allow up to 10MB for receipt images
+      sizeLimit: '10mb', // Allow up to 10MB for receipt images/PDFs
     },
   },
 };
@@ -38,10 +38,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    // Validate image format (base64 data URL)
-    if (!image.startsWith('data:image/')) {
-      console.log('❌ [API] Invalid image format');
-      return res.status(400).json({ error: 'Invalid image format. Expected base64 data URL' });
+    // Validate image/PDF format (base64 data URL)
+    if (!image.startsWith('data:image/') && !image.startsWith('data:application/pdf')) {
+      console.log('❌ [API] Invalid file format');
+      return res.status(400).json({ error: 'Invalid file format. Expected image or PDF base64 data URL' });
     }
 
     const imageSize = (image.length * 0.75 / 1024).toFixed(2); // Approximate KB
