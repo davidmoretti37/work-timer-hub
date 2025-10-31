@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Users, CalendarIcon, Download, FileSpreadsheet } from "lucide-react";
-import { formatHoursDetailed } from "@/utils/timeUtils";
+import { formatHoursDetailed, formatBreakTime } from "@/utils/timeUtils";
 import { format, subWeeks, subMonths, startOfDay, endOfDay, isWithinInterval, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval, formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
@@ -471,16 +471,17 @@ const Admin = () => {
 
       // Sessions detail
       summaryData.push(['Session Details']);
-      summaryData.push(['Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Status']);
+      summaryData.push(['Date', 'Clock In', 'Clock Out', 'Break Time', 'Hours Worked', 'Status']);
 
       userSessions.forEach(session => {
         const date = format(new Date(session.clock_in), 'MMM d, yyyy');
         const clockIn = format(new Date(session.clock_in), 'h:mm a');
         const clockOut = session.clock_out ? format(new Date(session.clock_out), 'h:mm a') : 'Active';
+        const breakTime = formatBreakTime(session.break_seconds);
         const hours = session.hours_worked ? session.hours_worked.toFixed(2) : '0.00';
         const status = session.clock_out ? 'Completed' : 'In Progress';
 
-        summaryData.push([date, clockIn, clockOut, hours, status]);
+        summaryData.push([date, clockIn, clockOut, breakTime, hours, status]);
       });
 
       // Create worksheet
@@ -595,7 +596,7 @@ const Admin = () => {
       // Detailed Sessions Sheet
       const detailedData = [];
       detailedData.push(['Detailed Time Sessions']);
-      detailedData.push(['User Name', 'Date', 'Clock In', 'Clock Out', 'Hours Worked', 'Status']);
+      detailedData.push(['User Name', 'Date', 'Clock In', 'Clock Out', 'Break Time', 'Hours Worked', 'Status']);
 
       filteredSessions.forEach(session => {
         const profile = profiles.get(session.user_id);
@@ -603,10 +604,11 @@ const Admin = () => {
         const date = format(new Date(session.clock_in), 'MMM d, yyyy');
         const clockIn = format(new Date(session.clock_in), 'h:mm a');
         const clockOut = session.clock_out ? format(new Date(session.clock_out), 'h:mm a') : 'Active';
+        const breakTime = formatBreakTime(session.break_seconds);
         const hours = session.hours_worked ? session.hours_worked.toFixed(2) : '0.00';
         const status = session.clock_out ? 'Completed' : 'In Progress';
 
-        detailedData.push([userName, date, clockIn, clockOut, hours, status]);
+        detailedData.push([userName, date, clockIn, clockOut, breakTime, hours, status]);
       });
 
       // Create detailed worksheet

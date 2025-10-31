@@ -32,9 +32,9 @@
             lastSentAt: 0,
             activityFlag: true,
             heartbeatMs: 5 * 60 * 1000,
-            // Shortened for local testing; restore production values before deploying broadly.
-            idleThresholdMs: 20 * 1000,
-            idleTimeoutMs: 10 * 1000,
+            // Production values
+            idleThresholdMs: 10 * 60 * 1000, // 10 minutes
+            idleTimeoutMs: 30 * 1000, // 30 seconds to respond
             listeners: [],
             intervalId: null,
             pending: false,
@@ -45,12 +45,17 @@
             idlePromptTimeout: null,
             idlePromptBody: null,
             idlePromptClose: null,
-            currentStatus: 'active'
+            currentStatus: 'active',
+            // Idle time tracking
+            idleStartTime: null,
+            totalIdleSeconds: 0
         };
 
         var recordInteraction = function() {
             tracker.lastInteraction = Date.now();
             tracker.activityFlag = true;
+            // Reset idle tracking when user is active
+            tracker.idleStartTime = null;
             if (!tracker.idlePromptActive) {
                 helper.evaluateStatus(component, tracker, true);
             }
@@ -118,6 +123,30 @@
             return;
         }
 
+        // If currently idle but user became active, reset and send active status
+        if (tracker.currentStatus === 'idle' && diff < tracker.idleThresholdMs) {
+            tracker.currentStatus = 'active';
+            tracker.idleStartTime = null;
+            this.sendStatus(component, tracker, 'active', true);
+            return;
+        }
+
+        // Send periodic updates while idle (every heartbeat interval)
+        if (tracker.currentStatus === 'idle') {
+            var heartbeatExpired = (now - tracker.lastSentAt) >= tracker.heartbeatMs;
+            if (heartbeatExpired && tracker.idleStartTime) {
+                var idleElapsedMs = now - tracker.idleStartTime;
+                var idleElapsedSeconds = Math.floor(idleElapsedMs / 1000);
+                var updatedTotalIdleSeconds = tracker.totalIdleSeconds + idleElapsedSeconds;
+
+                // Update and send cumulative idle time
+                tracker.totalIdleSeconds = updatedTotalIdleSeconds;
+                tracker.idleStartTime = now; // Reset start time for next interval
+                this.sendStatus(component, tracker, 'idle', true, tracker.totalIdleSeconds);
+            }
+            return;
+        }
+
         var heartbeatExpired = (now - tracker.lastSentAt) >= tracker.heartbeatMs;
         if (tracker.activityFlag || heartbeatExpired || triggeredByInteraction) {
             tracker.currentStatus = 'active';
@@ -125,7 +154,7 @@
         }
     },
 
-    sendStatus: function(component, tracker, status, force) {
+    sendStatus: function(component, tracker, status, force, idleSeconds) {
         if (!tracker || !status) {
             return;
         }
@@ -142,8 +171,12 @@
 
         tracker.pending = true;
 
-        var action = component.get("c.updateActivity");
-        action.setParams({ status: status });
+        var action = component.get("c.updateActivityWithIdle");
+        var params = { status: status };
+        if (idleSeconds !== undefined && idleSeconds !== null) {
+            params.idleSeconds = idleSeconds;
+        }
+        action.setParams(params);
         action.setCallback(this, function(response) {
             tracker.pending = false;
 
@@ -235,6 +268,8 @@
     confirmStillWorking: function(component, tracker) {
         tracker.lastInteraction = Date.now();
         tracker.activityFlag = true;
+        // Reset idle tracking when user confirms they're working
+        tracker.idleStartTime = null;
         this.closeIdlePrompt(tracker);
         this.sendStatus(component, tracker, 'active', true);
     },
@@ -246,7 +281,19 @@
 
         this.closeIdlePrompt(tracker);
         tracker.currentStatus = 'idle';
-        this.sendStatus(component, tracker, 'idle', true);
+
+        // Calculate idle time - from when they became idle to now
+        var now = Date.now();
+        if (!tracker.idleStartTime) {
+            // Set idle start time to when they crossed the threshold
+            tracker.idleStartTime = tracker.lastInteraction + tracker.idleThresholdMs;
+        }
+
+        var idleElapsedMs = now - tracker.idleStartTime;
+        var idleElapsedSeconds = Math.floor(idleElapsedMs / 1000);
+        tracker.totalIdleSeconds += idleElapsedSeconds;
+
+        this.sendStatus(component, tracker, 'idle', true, tracker.totalIdleSeconds);
         this.showToast(component, 'You have been marked as idle.', 'warning');
     },
 

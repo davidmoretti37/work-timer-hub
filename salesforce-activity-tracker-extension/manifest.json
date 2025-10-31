@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Salesforce Activity Tracker",
+  "version": "1.0.0",
+  "description": "Automatically track employee activity in Salesforce and detect idle time",
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*.salesforce.com/*",
+    "*://*.force.com/*",
+    "https://work-timer-hub.vercel.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.salesforce.com/*",
+        "*://*.force.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "popup.css"],
+      "matches": [
+        "*://*.salesforce.com/*",
+        "*://*.force.com/*"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
+

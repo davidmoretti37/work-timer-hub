@@ -58,7 +58,7 @@ export default async function handler(req: any, res: any) {
 
     const { data: record, error: recordError } = await supabase
       .from('clock_in_records')
-      .select('id, employee_id, clock_in_time, status, clock_out_time')
+      .select('id, employee_id, clock_in_time, status, clock_out_time, paused_at, break_seconds')
       .eq('employee_id', employee.id)
       .eq('status', 'clocked_in')
       .gte('clock_in_time', today.toISOString())
@@ -79,7 +79,7 @@ export default async function handler(req: any, res: any) {
     // Fallback: return the latest record for today even if already clocked out
     const { data: latestToday, error: latestError } = await supabase
       .from('clock_in_records')
-      .select('id, employee_id, clock_in_time, status, clock_out_time')
+      .select('id, employee_id, clock_in_time, status, clock_out_time, paused_at, break_seconds')
       .eq('employee_id', employee.id)
       .gte('clock_in_time', today.toISOString())
       .lt('clock_in_time', tomorrow.toISOString())

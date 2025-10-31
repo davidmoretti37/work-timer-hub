@@ -494,9 +494,24 @@ const Dashboard = () => {
         try {
           const nowIso = new Date().toISOString();
           const clockInIso = activeSession.clock_in_time || activeSession.clock_in || nowIso;
+
+          // Fetch the updated record to get the final break_seconds (in case user was paused when clocking out)
+          const { data: updatedRecord } = await supabase
+            .from('clock_in_records')
+            .select('break_seconds')
+            .eq('id', activeSession.id)
+            .single();
+
+          const finalBreakSeconds = updatedRecord?.break_seconds || activeSession.break_seconds || 0;
+
           await supabase
             .from('time_sessions')
-            .insert({ user_id: user.id, clock_in: clockInIso, clock_out: nowIso });
+            .insert({
+              user_id: user.id,
+              clock_in: clockInIso,
+              clock_out: nowIso,
+              break_seconds: finalBreakSeconds
+            });
         } catch (e) {
           console.error('Failed to persist time_sessions history:', e);
         }

@@ -40,11 +40,21 @@ public class ClockInService {
         }
 
         String userEmail = UserInfo.getUserEmail();
-        updateActivityAsync(userEmail, status);
+        updateActivityAsync(userEmail, status, null);
+    }
+
+    @AuraEnabled
+    public static void updateActivityWithIdle(String status, Integer idleSeconds) {
+        if (String.isBlank(status)) {
+            return;
+        }
+
+        String userEmail = UserInfo.getUserEmail();
+        updateActivityAsync(userEmail, status, idleSeconds);
     }
 
     @future(callout=true)
-    public static void updateActivityAsync(String userEmail, String status) {
+    public static void updateActivityAsync(String userEmail, String status, Integer idleSeconds) {
         try {
             HttpRequest req = new HttpRequest();
             req.setEndpoint('callout:Work_Timer_Hub_API/api/update-activity');
@@ -54,6 +64,9 @@ public class ClockInService {
             Map<String, Object> body = new Map<String, Object>();
             body.put('email', userEmail);
             body.put('status', status);
+            if (idleSeconds != null) {
+                body.put('idle_seconds', idleSeconds);
+            }
 
             req.setBody(JSON.serialize(body));
 
