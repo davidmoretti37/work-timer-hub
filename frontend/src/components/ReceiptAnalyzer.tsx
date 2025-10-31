@@ -305,12 +305,9 @@ export default function ReceiptAnalyzer({
           />
 
           {!isAnalyzing ? (
-            <div>
-              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-lg font-medium mb-2">Upload Receipt for Auto-Fill</p>
-              <p className="text-sm text-muted-foreground mb-4">
-                Click to browse or drag and drop a file here
-              </p>
+            <div className="flex items-center justify-center gap-3">
+              <span className="text-lg text-muted-foreground">Drag</span>
+              <span className="text-lg text-muted-foreground">or</span>
               <Button
                 type="button"
                 variant="outline"
@@ -321,29 +318,15 @@ export default function ReceiptAnalyzer({
               >
                 Choose File
               </Button>
-              <p className="text-xs text-muted-foreground mt-3">
-                Supports: JPG, PNG, WEBP, PDF (max 10MB)
-              </p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-lg font-medium">Analyzing Receipt...</p>
-              <p className="text-sm text-muted-foreground">
-                {progress < 40 && "Processing file..."}
-                {progress >= 40 && progress < 60 && "Uploading..."}
-                {progress >= 60 && progress < 90 && "Extracting text with OCR..."}
-                {progress >= 90 && "Almost done..."}
-              </p>
               <div className="w-full max-w-xs bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
                   className="bg-primary h-2 rounded-full transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                This may take 10-30 seconds
-              </p>
             </div>
           )}
         </div>
@@ -383,9 +366,8 @@ export default function ReceiptAnalyzer({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
+              <Label className="text-sm text-green-800 dark:text-green-200">
                 Amount
-                {getConfidenceIcon(analysisResult.confidence.amount)}
               </Label>
               <div className="text-2xl font-bold text-green-900 dark:text-green-100">
                 {formatCurrency(analysisResult.amount, analysisResult.currency)}
@@ -395,81 +377,35 @@ export default function ReceiptAnalyzer({
                   ≈ {formatCurrency(analysisResult.amountUSD, "USD")}
                 </div>
               )}
-              <div
-                className={`text-xs ${getConfidenceColor(
-                  analysisResult.confidence.amount
-                )}`}
-              >
-                {analysisResult.confidence.amount}% confidence
-              </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
+              <Label className="text-sm text-green-800 dark:text-green-200">
                 Vendor
-                {getConfidenceIcon(analysisResult.confidence.vendor)}
               </Label>
               <div className="text-lg font-medium text-green-900 dark:text-green-100">
-                {analysisResult.vendorName || "Not detected"}
-              </div>
-              <div
-                className={`text-xs ${getConfidenceColor(
-                  analysisResult.confidence.vendor
-                )}`}
-              >
-                {analysisResult.confidence.vendor}% confidence
+                {analysisResult.vendorName || "Unknown"}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
+              <Label className="text-sm text-green-800 dark:text-green-200">
                 Date
-                {getConfidenceIcon(analysisResult.confidence.date)}
               </Label>
               <div className="text-lg font-medium text-green-900 dark:text-green-100">
                 {analysisResult.date
                   ? analysisResult.date.toLocaleDateString()
-                  : "Not detected"}
-              </div>
-              <div
-                className={`text-xs ${getConfidenceColor(
-                  analysisResult.confidence.date
-                )}`}
-              >
-                {analysisResult.confidence.date}% confidence
+                  : "Unknown"}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
+              <Label className="text-sm text-green-800 dark:text-green-200">
                 Payment Method
-                {getConfidenceIcon(analysisResult.confidence.payment)}
               </Label>
               <div className="text-lg font-medium text-green-900 dark:text-green-100">
-                {analysisResult.paymentMethod}
+                {analysisResult.paymentMethod || "Unknown"}
               </div>
-              <div
-                className={`text-xs ${getConfidenceColor(
-                  analysisResult.confidence.payment
-                )}`}
-              >
-                {analysisResult.confidence.payment}% confidence
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-green-200 dark:border-green-800">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-green-800 dark:text-green-200">
-                Overall Confidence
-              </span>
-              <span
-                className={`text-sm font-semibold ${getConfidenceColor(
-                  analysisResult.confidence.overall
-                )}`}
-              >
-                {analysisResult.confidence.overall}%
-              </span>
             </div>
           </div>
 

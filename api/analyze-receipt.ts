@@ -106,26 +106,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       confidence: overallConfidence,
     });
 
-    // Validate the parsed data
+    // Validate the parsed data - only require amount
     if (!isValidParsedReceipt(parsed)) {
       return res.status(400).json({
         error: 'Could not extract required information',
         message: 'Unable to find the total amount. Please upload a clearer receipt or enter manually.',
         success: false,
-        partialData: {
-          text: extractedText,
-          parsed,
-        },
-      });
-    }
-
-    // Check confidence threshold
-    if (overallConfidence < 40) {
-      return res.status(400).json({
-        error: 'Low confidence in extracted data',
-        message: 'The image quality is too low. Please upload a clearer photo.',
-        success: false,
-        confidence: overallConfidence,
         partialData: {
           text: extractedText,
           parsed,
@@ -142,9 +128,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data: {
         amount: parsed.amount,
         currency: parsed.currency,
-        date: parsed.date,
-        vendorName: parsed.vendorName,
-        paymentMethod: parsed.paymentMethod,
+        date: parsed.date || null,
+        vendorName: parsed.vendorName || '',
+        paymentMethod: parsed.paymentMethod || '',
       },
       confidence: {
         overall: overallConfidence,
