@@ -202,7 +202,8 @@ const Dashboard = () => {
             if (result.session.status && result.session.status === 'clocked_out') {
               updateActiveSession(null);
             } else {
-              updateActiveSession({ ...result.session, source: "clock_in_records" });
+              // Use the source field from API response (either "clock_in_records" or "time_sessions")
+              updateActiveSession(result.session);
             }
             return;
           }

@@ -73,7 +73,7 @@ export default async function handler(req: any, res: any) {
 
     if (record) {
       console.log('[get-active-session] Found active record:', { record, email });
-      return res.status(200).json({ success: true, session: record });
+      return res.status(200).json({ success: true, session: { ...record, source: 'clock_in_records' } });
     }
 
     // Fallback: return the latest record for today even if already clocked out
@@ -95,7 +95,7 @@ export default async function handler(req: any, res: any) {
     // If we found a Salesforce record, return it
     if (latestToday) {
       console.log('[get-active-session] Fallback latest record:', { latestToday, email });
-      return res.status(200).json({ success: true, session: latestToday });
+      return res.status(200).json({ success: true, session: { ...latestToday, source: 'clock_in_records' } });
     }
 
     // Final fallback: Check time_sessions for manual clock-ins
@@ -134,7 +134,7 @@ export default async function handler(req: any, res: any) {
 
       if (timeSession) {
         console.log('[get-active-session] Found manual session:', { timeSession, email });
-        return res.status(200).json({ success: true, session: timeSession });
+        return res.status(200).json({ success: true, session: { ...timeSession, source: 'time_sessions' } });
       }
 
       console.log('[get-active-session] No active session found in any table');
