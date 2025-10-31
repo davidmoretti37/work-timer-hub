@@ -674,10 +674,17 @@ export default function ExpenseReimbursementForm({
                 </div>
 
                 {expense.receiptFile && (
-                  <div className="mt-3 pt-3 border-t text-xs text-muted-foreground flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = URL.createObjectURL(expense.receiptFile!);
+                      window.open(url, '_blank');
+                    }}
+                    className="mt-3 pt-3 border-t text-xs text-muted-foreground flex items-center gap-2 hover:text-green-600 hover:underline cursor-pointer w-full text-left"
+                  >
                     <FileCheck className="h-3 w-3" />
                     Receipt: {expense.receiptFile.name}
-                  </div>
+                  </button>
                 )}
               </Card>
             ))}
@@ -851,9 +858,16 @@ export default function ExpenseReimbursementForm({
                         className="hidden"
                       />
                       {expense.receiptFile && (
-                        <span className="text-xs text-green-600 truncate">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = URL.createObjectURL(expense.receiptFile!);
+                            window.open(url, '_blank');
+                          }}
+                          className="text-xs text-green-600 truncate hover:underline cursor-pointer text-left"
+                        >
                           {expense.receiptFile.name}
-                        </span>
+                        </button>
                       )}
                     </div>
                   </TableCell>
