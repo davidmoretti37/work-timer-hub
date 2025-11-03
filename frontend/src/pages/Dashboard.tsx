@@ -179,7 +179,14 @@ const Dashboard = () => {
         console.log('[Dashboard] Skipping stale update', { fetchId, current: fetchSeqRef.current, session });
         return;
       }
-      console.log('[Dashboard] Updating active session', { fetchId, current: fetchSeqRef.current, session });
+      console.log('[Dashboard] Updating active session', {
+        fetchId,
+        current: fetchSeqRef.current,
+        session,
+        paused_at: session?.paused_at,
+        break_seconds: session?.break_seconds,
+        source: session?.source
+      });
       setActiveSession(session);
     };
 
@@ -567,35 +574,85 @@ const Dashboard = () => {
   };
 
   const handlePause = async () => {
-    if (!user || !activeSession || activeSession.paused_at) return;
+    console.log('[Dashboard] handlePause called', { user: !!user, activeSession, paused_at: activeSession?.paused_at });
+
+    if (!user) {
+      console.error('[Dashboard] handlePause: No user');
+      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
+      return;
+    }
+
+    if (!activeSession) {
+      console.error('[Dashboard] handlePause: No active session');
+      toast({ title: "Error", description: "No active session found", variant: "destructive" });
+      return;
+    }
+
+    if (activeSession.paused_at) {
+      console.error('[Dashboard] handlePause: Already on break', { activeSession });
+      toast({ title: "Already on break", description: "You are already on a lunch break", variant: "destructive" });
+      return;
+    }
+
     if (activeSession.source !== "time_sessions") {
+      console.error('[Dashboard] handlePause: Wrong source', { source: activeSession.source });
       toast({ title: "Pause unavailable", description: "This clock-in is managed externally.", variant: "destructive" });
       return;
     }
+
     setLoading(true);
-    const { error } = await supabase
-      .from("time_sessions")
-      .update({ paused_at: new Date().toISOString() })
-      .eq("id", activeSession.id);
-    if (error) {
-      toast({ title: "Error", description: "Failed to start lunch break", variant: "destructive" });
-    } else {
+    try {
+      console.log('[Dashboard] Starting lunch break', { sessionId: activeSession.id });
+      const { error } = await supabase
+        .from("time_sessions")
+        .update({ paused_at: new Date().toISOString() })
+        .eq("id", activeSession.id);
+      if (error) {
+        throw error;
+      }
+      console.log('[Dashboard] Successfully started lunch break');
       await fetchActiveSession(user.id, employeeId);
+    } catch (error: any) {
+      console.error('[Dashboard] Error starting lunch break:', error);
+      toast({ title: "Error", description: error.message || "Failed to start lunch break", variant: "destructive" });
     }
     setLoading(false);
   };
 
   const handleResume = async () => {
-    if (!user || !activeSession || !activeSession.paused_at) return;
+    console.log('[Dashboard] handleResume called', { user: !!user, activeSession, paused_at: activeSession?.paused_at });
+
+    if (!user) {
+      console.error('[Dashboard] handleResume: No user');
+      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
+      return;
+    }
+
+    if (!activeSession) {
+      console.error('[Dashboard] handleResume: No active session');
+      toast({ title: "Error", description: "No active session found", variant: "destructive" });
+      return;
+    }
+
+    if (!activeSession.paused_at) {
+      console.error('[Dashboard] handleResume: Not on break', { activeSession });
+      toast({ title: "Not on break", description: "You are not currently on a lunch break", variant: "destructive" });
+      return;
+    }
+
     if (activeSession.source !== "time_sessions") {
+      console.error('[Dashboard] handleResume: Wrong source', { source: activeSession.source });
       toast({ title: "Resume unavailable", description: "This clock-in is managed externally.", variant: "destructive" });
       return;
     }
+
     setLoading(true);
     try {
       const pausedAt = new Date(activeSession.paused_at);
       const deltaSec = Math.max(0, Math.floor((Date.now() - pausedAt.getTime()) / 1000));
       const newBreakSeconds = (activeSession.break_seconds || 0) + deltaSec;
+      console.log('[Dashboard] Resuming from break', { pausedAt, deltaSec, newBreakSeconds, sessionId: activeSession.id });
+
       const { error } = await supabase
         .from("time_sessions")
         .update({ break_seconds: newBreakSeconds, paused_at: null })
@@ -603,8 +660,11 @@ const Dashboard = () => {
       if (error) {
         throw error;
       }
+
+      console.log('[Dashboard] Successfully resumed from break');
       await fetchActiveSession(user.id, employeeId);
     } catch (error: any) {
+      console.error('[Dashboard] Error resuming from break:', error);
       toast({ title: "Error", description: error.message || "Failed to resume from break", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -612,46 +672,128 @@ const Dashboard = () => {
   };
 
   const handlePauseClockInRecord = async () => {
-    if (!user || !activeSession) return;
-    if (activeSession.source !== "clock_in_records") return;
+    console.log('[Dashboard] handlePauseClockInRecord called', { user: !!user, activeSession, paused_at: activeSession?.paused_at });
+
+    if (!user) {
+      console.error('[Dashboard] handlePauseClockInRecord: No user');
+      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
+      return;
+    }
+
+    if (!activeSession) {
+      console.error('[Dashboard] handlePauseClockInRecord: No active session');
+      toast({ title: "Error", description: "No active session found", variant: "destructive" });
+      return;
+    }
+
+    if (activeSession.paused_at) {
+      console.error('[Dashboard] handlePauseClockInRecord: Already on break', { activeSession });
+      toast({ title: "Already on break", description: "You are already on a lunch break", variant: "destructive" });
+      return;
+    }
+
+    if (activeSession.source !== "clock_in_records") {
+      console.error('[Dashboard] handlePauseClockInRecord: Wrong source', { source: activeSession.source });
+      toast({ title: "Pause unavailable", description: "This session type cannot be paused here", variant: "destructive" });
+      return;
+    }
 
     setLoading(true);
-    const { error } = await supabase
-      .from("clock_in_records")
-      .update({ paused_at: new Date().toISOString() })
-      .eq("id", activeSession.id);
+    try {
+      const pausedAtTime = new Date().toISOString();
+      console.log('[Dashboard] Starting lunch break (clock_in_records)', {
+        sessionId: activeSession.id,
+        pausedAtTime,
+        currentPausedAt: activeSession.paused_at
+      });
 
-    if (error) {
-      toast({ title: "Error", description: "Failed to start lunch break", variant: "destructive" });
-    } else {
+      const { data, error, count } = await supabase
+        .from("clock_in_records")
+        .update({ paused_at: pausedAtTime })
+        .eq("id", activeSession.id)
+        .select();
+
+      console.log('[Dashboard] Update result', { data, error, count, rowsAffected: data?.length });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        throw new Error('No rows were updated. The record may not exist or you may not have permission to update it.');
+      }
+
+      console.log('[Dashboard] Successfully started lunch break (clock_in_records)', { updatedRecord: data[0] });
       toast({ title: "Lunch Break Started", description: "Your break has started" });
       await fetchActiveSession(user.id, employeeId);
+    } catch (error: any) {
+      console.error('[Dashboard] Error starting lunch break (clock_in_records):', error);
+      toast({ title: "Error", description: error.message || "Failed to start lunch break", variant: "destructive" });
     }
     setLoading(false);
   };
 
   const handleResumeClockInRecord = async () => {
-    if (!user || !activeSession || !activeSession.paused_at) return;
-    if (activeSession.source !== "clock_in_records") return;
+    console.log('[Dashboard] handleResumeClockInRecord called', { user: !!user, activeSession, paused_at: activeSession?.paused_at });
+
+    if (!user) {
+      console.error('[Dashboard] handleResumeClockInRecord: No user');
+      toast({ title: "Error", description: "User not authenticated", variant: "destructive" });
+      return;
+    }
+
+    if (!activeSession) {
+      console.error('[Dashboard] handleResumeClockInRecord: No active session');
+      toast({ title: "Error", description: "No active session found", variant: "destructive" });
+      return;
+    }
+
+    if (!activeSession.paused_at) {
+      console.error('[Dashboard] handleResumeClockInRecord: Not on break', { activeSession });
+      toast({ title: "Not on break", description: "You are not currently on a lunch break", variant: "destructive" });
+      return;
+    }
+
+    if (activeSession.source !== "clock_in_records") {
+      console.error('[Dashboard] handleResumeClockInRecord: Wrong source', { source: activeSession.source });
+      toast({ title: "Resume unavailable", description: "This session type cannot be resumed here", variant: "destructive" });
+      return;
+    }
 
     setLoading(true);
     try {
       const pausedAt = new Date(activeSession.paused_at);
       const deltaSec = Math.max(0, Math.floor((Date.now() - pausedAt.getTime()) / 1000));
       const newBreakSeconds = (activeSession.break_seconds || 0) + deltaSec;
+      console.log('[Dashboard] Resuming from break (clock_in_records)', {
+        pausedAt,
+        deltaSec,
+        newBreakSeconds,
+        sessionId: activeSession.id,
+        currentBreakSeconds: activeSession.break_seconds
+      });
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("clock_in_records")
         .update({ break_seconds: newBreakSeconds, paused_at: null })
-        .eq("id", activeSession.id);
+        .eq("id", activeSession.id)
+        .select();
+
+      console.log('[Dashboard] Resume update result', { data, error, rowsAffected: data?.length });
 
       if (error) {
         throw error;
       }
 
+      if (!data || data.length === 0) {
+        throw new Error('No rows were updated. The record may not exist or you may not have permission to update it.');
+      }
+
+      console.log('[Dashboard] Successfully resumed from break (clock_in_records)', { updatedRecord: data[0] });
       toast({ title: "Resumed", description: "You're back from break" });
       await fetchActiveSession(user.id, employeeId);
     } catch (error: any) {
+      console.error('[Dashboard] Error resuming from break (clock_in_records):', error);
       toast({ title: "Error", description: error.message || "Failed to resume from break", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -683,7 +825,15 @@ const Dashboard = () => {
   };
 
   const formattedClockIn = formatClockIn(clockInTimestamp);
-  const isPaused = isTimeSession && !!activeSession?.paused_at;
+  const isPaused = !!activeSession?.paused_at;
+
+  console.log('[Dashboard] Render state', {
+    activeSession: !!activeSession,
+    source: activeSession?.source,
+    paused_at: activeSession?.paused_at,
+    isPaused,
+    isTimeSession
+  });
 
   if (!user || !profile) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
