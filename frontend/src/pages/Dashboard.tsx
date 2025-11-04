@@ -530,12 +530,6 @@ const Dashboard = () => {
       return;
     }
 
-    if (activeSession.source !== "clock_in_records") {
-      console.error('[Dashboard] handlePauseClockInRecord: Wrong source', { source: activeSession.source });
-      toast({ title: "Pause unavailable", description: "This session type cannot be paused here", variant: "destructive" });
-      return;
-    }
-
     setLoading(true);
     try {
       const pausedAtTime = new Date().toISOString();
@@ -589,12 +583,6 @@ const Dashboard = () => {
     if (!activeSession.paused_at) {
       console.error('[Dashboard] handleResumeClockInRecord: Not on break', { activeSession });
       toast({ title: "Not on break", description: "You are not currently on a lunch break", variant: "destructive" });
-      return;
-    }
-
-    if (activeSession.source !== "clock_in_records") {
-      console.error('[Dashboard] handleResumeClockInRecord: Wrong source', { source: activeSession.source });
-      toast({ title: "Resume unavailable", description: "This session type cannot be resumed here", variant: "destructive" });
       return;
     }
 
