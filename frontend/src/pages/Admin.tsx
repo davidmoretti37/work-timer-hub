@@ -102,6 +102,8 @@ const Admin = () => {
       .select("*, employees(email, name, id)")
       .order("clock_in_time", { ascending: false});
 
+    console.log("RAW sessionsData from database:", sessionsData);
+
     if (sessionsData) {
       // Transform to match expected format
       const transformedSessions = sessionsData.map((record: any) => ({
