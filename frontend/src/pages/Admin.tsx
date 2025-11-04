@@ -123,36 +123,57 @@ const Admin = () => {
 
       setSessions(transformedSessions);
 
-      // Map employees to profiles by email
-      const uniqueEmails = [...new Set(transformedSessions.map((s: any) => s.employee_email).filter(Boolean))];
+      // Get unique user_ids from sessions
+      const uniqueUserIds = [...new Set(transformedSessions.map((s: any) => s.user_id).filter(Boolean))];
 
-      // Get auth users by email to get their user_id
+      // Fetch all profiles in bulk using user_ids
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("*")
+        .in("id", uniqueUserIds);
+
+      // Create profile map
       const profileMap = new Map();
-      for (const email of uniqueEmails) {
-        const { data: authUsers } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", (await supabase.auth.admin.getUserById(email as string))?.data?.user?.id)
-          .maybeSingle();
 
-        if (authUsers) {
-          // Use employee_email as the key since we don't have guaranteed user_id linkage yet
-          const matchingSession = transformedSessions.find((s: any) => s.employee_email === email);
-          if (matchingSession) {
-            profileMap.set(matchingSession.user_id, authUsers);
-          }
-        } else {
-          // Create a synthetic profile from employee data
-          const matchingSession = transformedSessions.find((s: any) => s.employee_email === email);
-          if (matchingSession) {
-            profileMap.set(matchingSession.user_id, {
-              id: matchingSession.user_id,
-              full_name: matchingSession.employee_name || email,
-              admin_display_name: null
-            });
-          }
-        }
+      if (profilesData) {
+        // Map profiles by user_id
+        profilesData.forEach((profile: any) => {
+          profileMap.set(profile.id, profile);
+        });
       }
+
+      // Override profiles with employee data when available (employee data is more accurate)
+      transformedSessions.forEach((session: any) => {
+        if (session.user_id) {
+          const existingProfile = profileMap.get(session.user_id);
+
+          // Determine the best display name
+          let displayName = "Unknown User";
+
+          // If admin_display_name is set, use it
+          if (existingProfile?.admin_display_name) {
+            displayName = existingProfile.admin_display_name;
+          }
+          // If employee_name exists and is not a company name, use it
+          else if (session.employee_name && session.employee_name !== "Bayco Aviation") {
+            displayName = session.employee_name;
+          }
+          // Fall back to employee email
+          else if (session.employee_email) {
+            displayName = session.employee_email;
+          }
+          // Last resort: use profile full_name if it exists
+          else if (existingProfile?.full_name) {
+            displayName = existingProfile.full_name;
+          }
+
+          profileMap.set(session.user_id, {
+            id: session.user_id,
+            full_name: displayName,
+            admin_display_name: existingProfile?.admin_display_name || null
+          });
+        }
+      });
 
       setProfiles(profileMap);
       console.log("Profiles loaded:", profileMap);

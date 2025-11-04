@@ -202,29 +202,10 @@ const Dashboard = () => {
       .order("created_at", { ascending: false});
 
     if (data) {
-      // Fetch active sessions for each user from clock_in_records
+      // Fetch active sessions for each user from clock_in_records using user_id
       const usersWithSessions = await Promise.all(
         data.map(async (userProfile) => {
-          // Get user's email to lookup in employees table
-          const { data: authUser } = await supabase.auth.admin.getUserById(userProfile.id);
-          const userEmail = authUser?.user?.email;
-
-          if (!userEmail) {
-            return { ...userProfile, activeSession: null };
-          }
-
-          // Find employee record by email
-          const { data: employee } = await supabase
-            .from("employees")
-            .select("id")
-            .eq("email", userEmail.toLowerCase().trim())
-            .maybeSingle();
-
-          if (!employee) {
-            return { ...userProfile, activeSession: null };
-          }
-
-          // Get active clock_in_record
+          // Get active clock_in_record directly using user_id
           const today = new Date();
           today.setHours(0, 0, 0, 0);
           const tomorrow = new Date(today);
@@ -233,7 +214,7 @@ const Dashboard = () => {
           const { data: activeSession } = await supabase
             .from("clock_in_records")
             .select("*")
-            .eq("employee_id", employee.id)
+            .eq("user_id", userProfile.id)
             .eq("status", "clocked_in")
             .gte("clock_in_time", today.toISOString())
             .lt("clock_in_time", tomorrow.toISOString())
@@ -258,18 +239,13 @@ const Dashboard = () => {
     }
 
     try {
-      // First, delete from auth.users (this will cascade to profiles due to foreign key)
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      
-      if (authError) {
-        // If admin API doesn't work, try deleting profile directly
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .delete()
-          .eq("id", userId);
-          
-        if (profileError) throw profileError;
-      }
+      // Delete from profiles table (will cascade to related data via foreign keys)
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", userId);
+
+      if (profileError) throw profileError;
 
       toast({
         title: "User deleted",
