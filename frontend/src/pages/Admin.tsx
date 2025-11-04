@@ -96,7 +96,14 @@ const Admin = () => {
   };
 
   const fetchAllSessions = async () => {
-    // Fetch all clock_in_records with employee info
+    // First, fetch ALL profiles (all users in the system)
+    const { data: allProfilesData } = await supabase
+      .from("profiles")
+      .select("*");
+
+    console.log("All profiles from database:", allProfilesData);
+
+    // Then fetch all clock_in_records with employee info
     const { data: sessionsData } = await supabase
       .from("clock_in_records")
       .select("*, employees(email, name, id)")
@@ -104,83 +111,73 @@ const Admin = () => {
 
     console.log("RAW sessionsData from database:", sessionsData);
 
-    if (sessionsData) {
-      // Transform to match expected format
-      const transformedSessions = sessionsData.map((record: any) => ({
-        id: record.id,
-        user_id: record.user_id || record.employee_id, // Use employee_id as fallback
-        clock_in: record.clock_in_time,
-        clock_out: record.clock_out_time,
-        paused_at: record.paused_at,
-        break_seconds: record.break_seconds,
-        break_end: record.break_end,
-        employee_email: record.employees?.email,
-        employee_name: record.employees?.name,
-        // Calculate hours_worked from clock_in_time and clock_out_time
-        hours_worked: record.clock_out_time
-          ? (new Date(record.clock_out_time).getTime() - new Date(record.clock_in_time).getTime()) / (1000 * 60 * 60) -
-            (record.break_seconds || 0) / 3600
-          : null
-      }));
+    // Transform sessions
+    const transformedSessions = sessionsData
+      ? sessionsData
+          .filter((record: any) => record.user_id !== null)
+          .map((record: any) => ({
+            id: record.id,
+            user_id: record.user_id,
+            clock_in: record.clock_in_time,
+            clock_out: record.clock_out_time,
+            paused_at: record.paused_at,
+            break_seconds: record.break_seconds,
+            break_end: record.break_end,
+            employee_email: record.employees?.email,
+            employee_name: record.employees?.name,
+            hours_worked: record.clock_out_time
+              ? (new Date(record.clock_out_time).getTime() - new Date(record.clock_in_time).getTime()) / (1000 * 60 * 60) -
+                (record.break_seconds || 0) / 3600
+              : null
+          }))
+      : [];
 
-      setSessions(transformedSessions);
+    setSessions(transformedSessions);
 
-      // Get unique user_ids from sessions
-      const uniqueUserIds = [...new Set(transformedSessions.map((s: any) => s.user_id).filter(Boolean))];
-
-      // Fetch all profiles in bulk using user_ids
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", uniqueUserIds);
-
-      // Create profile map
-      const profileMap = new Map();
-
-      if (profilesData) {
-        // Map profiles by user_id
-        profilesData.forEach((profile: any) => {
-          profileMap.set(profile.id, profile);
+    // Build a map of user_id -> employee data from sessions
+    const userEmployeeData = new Map();
+    transformedSessions.forEach((session: any) => {
+      if (session.user_id && !userEmployeeData.has(session.user_id)) {
+        userEmployeeData.set(session.user_id, {
+          employee_name: session.employee_name,
+          employee_email: session.employee_email
         });
       }
+    });
 
-      // Override profiles with employee data when available (employee data is more accurate)
-      transformedSessions.forEach((session: any) => {
-        if (session.user_id) {
-          const existingProfile = profileMap.get(session.user_id);
+    // Build profile map for ALL users (not just those with sessions)
+    const profileMap = new Map();
+    if (allProfilesData) {
+      allProfilesData.forEach((profile: any) => {
+        const employeeData = userEmployeeData.get(profile.id);
 
-          // Determine the best display name
-          let displayName = "Unknown User";
+        // Determine the best display name
+        let displayName = profile.full_name || "Unknown User";
 
-          // If admin_display_name is set, use it
-          if (existingProfile?.admin_display_name) {
-            displayName = existingProfile.admin_display_name;
-          }
-          // If employee_name exists and is not a company name, use it
-          else if (session.employee_name && session.employee_name !== "Bayco Aviation") {
-            displayName = session.employee_name;
-          }
-          // Fall back to employee email
-          else if (session.employee_email) {
-            displayName = session.employee_email;
-          }
-          // Last resort: use profile full_name if it exists
-          else if (existingProfile?.full_name) {
-            displayName = existingProfile.full_name;
-          }
-
-          profileMap.set(session.user_id, {
-            id: session.user_id,
-            full_name: displayName,
-            admin_display_name: existingProfile?.admin_display_name || null
-          });
+        // If admin_display_name is set, use it (highest priority)
+        if (profile.admin_display_name) {
+          displayName = profile.admin_display_name;
         }
-      });
+        // If employee_name exists and is not a company name, use it
+        else if (employeeData?.employee_name && employeeData.employee_name !== "Bayco Aviation") {
+          displayName = employeeData.employee_name;
+        }
+        // Fall back to employee email
+        else if (employeeData?.employee_email) {
+          displayName = employeeData.employee_email;
+        }
 
-      setProfiles(profileMap);
-      console.log("Profiles loaded:", profileMap);
-      console.log("Sessions:", transformedSessions);
+        profileMap.set(profile.id, {
+          id: profile.id,
+          full_name: displayName,
+          admin_display_name: profile.admin_display_name || null
+        });
+      });
     }
+
+    setProfiles(profileMap);
+    console.log("Profiles loaded:", profileMap);
+    console.log("Sessions:", transformedSessions);
 
     await fetchEmployeeActivity();
   };
@@ -732,7 +729,8 @@ const Admin = () => {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  const uniqueUserIds = [...new Set(sessions.map(s => s.user_id))];
+  // Get ALL user IDs from profiles (not just those with sessions)
+  const uniqueUserIds = Array.from(profiles.keys());
   const filteredUserIds = uniqueUserIds.filter(id => selectedUserIds.has(id));
 
   return (
