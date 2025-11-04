@@ -418,6 +418,12 @@ const Admin = () => {
         updateData.break_end = breakEnd;
       }
 
+      // Reset break_seconds when setting explicit break times
+      // This ensures the trigger recalculates it fresh instead of adding to existing value
+      if ((breakStart !== undefined || breakEnd !== undefined)) {
+        updateData.break_seconds = 0;
+      }
+
       const { error } = await supabase
         .from("clock_in_records")
         .update(updateData)
