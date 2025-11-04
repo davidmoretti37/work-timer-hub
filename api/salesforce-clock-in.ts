@@ -110,10 +110,15 @@ export default async function handler(req: any, res: any) {
 
     const clockInTimeIso = (providedLoginTime ?? new Date()).toISOString();
 
+    // Get the auth user_id from the employee email
+    const { data: authUser } = await supabase.auth.admin.listUsers();
+    const user = authUser?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+
     const { data: clockIn, error: clockError } = await supabase
       .from('clock_in_records')
       .insert({
         employee_id: employee.id,
+        user_id: user?.id || null,
         clock_in_time: clockInTimeIso,
         status: 'clocked_in',
       })

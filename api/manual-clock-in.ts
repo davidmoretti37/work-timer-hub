@@ -35,6 +35,8 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ success: false, error: `Employee lookup failed: ${employeeError.message}` });
     }
 
+    let employeeId: string;
+
     if (!employee) {
       // Create employee record for manual clock-ins
       const { data: newEmployee, error: createError } = await supabase
@@ -47,22 +49,9 @@ export default async function handler(req: any, res: any) {
         return res.status(500).json({ success: false, error: `Failed to create employee: ${createError.message}` });
       }
 
-      const employeeId = newEmployee.id;
-
-      // Create clock-in record
-      const { data, error } = await supabase
-        .from('clock_in_records')
-        .insert({
-          employee_id: employeeId,
-          clock_in_time: clockInIso,
-          status: 'clocked_in'
-        })
-        .select()
-        .single();
-
-      if (error) return res.status(500).json({ success: false, error: error.message });
-
-      return res.status(200).json({ success: true, session: data });
+      employeeId = newEmployee.id;
+    } else {
+      employeeId = employee.id;
     }
 
     // Check for existing active session today
@@ -74,7 +63,7 @@ export default async function handler(req: any, res: any) {
     const { data: existing } = await supabase
       .from('clock_in_records')
       .select('*')
-      .eq('employee_id', employee.id)
+      .eq('employee_id', employeeId)
       .eq('status', 'clocked_in')
       .gte('clock_in_time', today.toISOString())
       .lt('clock_in_time', tomorrow.toISOString())
@@ -85,11 +74,11 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true, message: 'Already clocked in', session: existing[0] });
     }
 
-    // Create new clock-in record
+    // Create new clock-in record (user_id will be set by database trigger)
     const { data, error } = await supabase
       .from('clock_in_records')
       .insert({
-        employee_id: employee.id,
+        employee_id: employeeId,
         clock_in_time: clockInIso,
         status: 'clocked_in'
       })
