@@ -155,13 +155,14 @@ serve(async (req) => {
       }
 
       // Idempotent clock-in for current UTC day
+      // Check if ANY clock-in record exists today (clocked_in OR clocked_out)
+      // to prevent auto-clocking back in after the user has clocked out
       const today = new Date().toISOString().split("T")[0];
       const { data: existingClockIn, error: existingErr } = await supabase
         .from("clock_in_records")
-        .select("id")
+        .select("id, status")
         .eq("employee_id", employee.id)
         .gte("clock_in_time", `${today}T00:00:00Z`)
-        .eq("status", "clocked_in")
         .maybeSingle();
       if (existingErr && existingErr.code !== "PGRST116") {
         // ignore no rows code; proceed otherwise
@@ -272,13 +273,14 @@ serve(async (req) => {
 
         if (!employeeId) return false;
 
+        // Check if ANY clock-in record exists today (clocked_in OR clocked_out)
+        // to prevent auto-clocking back in after the user has clocked out
         const today = new Date().toISOString().split("T")[0];
         const { data: existingClockIn } = await supabase
           .from("clock_in_records")
-          .select("id")
+          .select("id, status")
           .eq("employee_id", employeeId)
           .gte("clock_in_time", `${today}T00:00:00Z`)
-          .eq("status", "clocked_in")
           .maybeSingle();
 
         if (!existingClockIn) {

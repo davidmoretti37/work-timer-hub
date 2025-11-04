@@ -130,46 +130,6 @@ const Dashboard = () => {
     return isAdminUser;
   };
 
-  const syncClockInRecordToTimeSession = async (userId: string, clockInRecord: any) => {
-    try {
-      const { data: existingSession, error: existingError } = await supabase
-        .from("time_sessions")
-        .select("*")
-        .eq("user_id", userId)
-        .is("clock_out", null)
-        .order("clock_in", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingError) {
-        console.error("Error checking existing session:", existingError);
-      }
-
-      if (existingSession) {
-        return { session: existingSession, clockInRecordId: clockInRecord?.id ?? null };
-      }
-
-      const { data: createdSession, error: createError } = await supabase
-        .from("time_sessions")
-        .insert({
-          user_id: userId,
-          clock_in: clockInRecord?.clock_in_time || new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (createError) {
-        console.error("Error creating session from clock-in record:", createError);
-        return null;
-      }
-
-      return { session: createdSession, clockInRecordId: clockInRecord?.id ?? null };
-    } catch (error) {
-      console.error("Failed to sync clock-in record:", error);
-      return null;
-    }
-  };
-
   const fetchActiveSession = async (userId: string, currentEmployeeId?: string | null) => {
     const fetchId = ++fetchSeqRef.current;
     console.log('[Dashboard] Starting fetchActiveSession', { fetchId, userId, currentEmployeeId, email: user?.email });
@@ -184,44 +144,13 @@ const Dashboard = () => {
         current: fetchSeqRef.current,
         session,
         paused_at: session?.paused_at,
-        break_seconds: session?.break_seconds,
-        source: session?.source
+        break_seconds: session?.break_seconds
       });
       setActiveSession(session);
     };
 
-    const baseUrl =
-      typeof window !== 'undefined' && window.location.origin?.includes('localhost')
-        ? 'https://work-timer-hub.vercel.app'
-        : window.location.origin || 'https://work-timer-hub.vercel.app';
-
-    if (user?.email) {
-      try {
-        const response = await fetch(
-          `${baseUrl}/api/get-active-session?email=${encodeURIComponent(user.email)}`,
-          { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }
-        );
-        if (response.ok) {
-          const result = await response.json();
-          console.log('[Dashboard] API response', { fetchId, result });
-          if (result.success && result.session) {
-            // If API falls back to latest record but it's already clocked_out, treat as no active session
-            if (result.session.status && result.session.status === 'clocked_out') {
-              updateActiveSession(null);
-            } else {
-              // Use the source field from API response (either "clock_in_records" or "time_sessions")
-              updateActiveSession(result.session);
-            }
-            return;
-          }
-        } else {
-          console.error("Failed to fetch active session via API:", await response.text());
-        }
-      } catch (error) {
-        console.error("Error calling get-active-session API:", error);
-      }
-    }
-
+    // Query clock_in_records for active session
+    // Use user_id if available, otherwise fallback to employee_id
     if (currentEmployeeId) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -230,7 +159,7 @@ const Dashboard = () => {
 
       const { data: clockInRecord, error: clockInError } = await supabase
         .from("clock_in_records")
-        .select("*")
+        .select("*, employees(email, name)")
         .eq("employee_id", currentEmployeeId)
         .eq("status", "clocked_in")
         .gte("clock_in_time", today.toISOString())
@@ -241,105 +170,84 @@ const Dashboard = () => {
 
       if (clockInError) {
         console.error("Error fetching clock-in records:", clockInError);
-      }
-
-      if (clockInRecord) {
-        console.log('[Dashboard] Found clockInRecord from Supabase', { fetchId, clockInRecord });
-        const syncedSession = await syncClockInRecordToTimeSession(userId, clockInRecord);
-        if (syncedSession?.session) {
-          updateActiveSession({ ...syncedSession.session, source: "time_sessions", clockInRecordId: syncedSession.clockInRecordId });
-          return;
-        }
-
-        updateActiveSession({ ...clockInRecord, source: "clock_in_records" });
+        updateActiveSession(null);
         return;
       }
 
-      // If there is no active record, check if a completed record exists today and backfill time_sessions
-      const { data: latestToday } = await supabase
-        .from("clock_in_records")
-        .select("*")
-        .eq("employee_id", currentEmployeeId)
-        .gte("clock_in_time", today.toISOString())
-        .lt("clock_in_time", tomorrow.toISOString())
-        .order("clock_in_time", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (latestToday && latestToday.status === 'clocked_out') {
-        // Persist a historical time session if none exists
-        try {
-          const { data: existingSession } = await supabase
-            .from("time_sessions")
-            .select("*")
-            .eq("user_id", userId)
-            .gte("clock_in", today.toISOString())
-            .lt("clock_in", tomorrow.toISOString())
-            .limit(1)
-            .maybeSingle();
-
-          if (!existingSession) {
-            await supabase.from("time_sessions").insert({
-              user_id: userId,
-              clock_in: latestToday.clock_in_time,
-              clock_out: latestToday.clock_out_time || new Date().toISOString(),
-            });
-          }
-        } catch (e) {
-          console.error('[Dashboard] Failed to backfill time_sessions from clock_in_records:', e);
-        }
+      if (clockInRecord) {
+        console.log('[Dashboard] Found active clock_in_record', { fetchId, clockInRecord });
+        updateActiveSession(clockInRecord);
+        return;
       }
+
+      // No active session found
+      console.log('[Dashboard] No active session found', { fetchId });
+      updateActiveSession(null);
+    } else {
+      console.log('[Dashboard] No employee_id available', { fetchId });
+      updateActiveSession(null);
     }
-
-    const { data: timeSession, error: timeSessionError } = await supabase
-      .from("time_sessions")
-      .select("*")
-      .eq("user_id", userId)
-      .is("clock_out", null)
-      .order("clock_in", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (timeSessionError) {
-      console.error("Error fetching time session:", timeSessionError);
-    }
-
-    console.log('[Dashboard] Final fallback to timeSession', { fetchId, timeSession });
-    updateActiveSession(timeSession ? { ...timeSession, source: "time_sessions" } : null);
   };
 
   const fetchAllUsers = async () => {
     const { data } = await supabase
       .from("profiles")
       .select(`
-        id, 
-        full_name, 
+        id,
+        full_name,
         admin_display_name,
         created_at,
         user_roles(role)
       `)
-      .order("created_at", { ascending: false });
-    
+      .order("created_at", { ascending: false});
+
     if (data) {
-      // Fetch active sessions for each user
+      // Fetch active sessions for each user from clock_in_records
       const usersWithSessions = await Promise.all(
         data.map(async (userProfile) => {
+          // Get user's email to lookup in employees table
+          const { data: authUser } = await supabase.auth.admin.getUserById(userProfile.id);
+          const userEmail = authUser?.user?.email;
+
+          if (!userEmail) {
+            return { ...userProfile, activeSession: null };
+          }
+
+          // Find employee record by email
+          const { data: employee } = await supabase
+            .from("employees")
+            .select("id")
+            .eq("email", userEmail.toLowerCase().trim())
+            .maybeSingle();
+
+          if (!employee) {
+            return { ...userProfile, activeSession: null };
+          }
+
+          // Get active clock_in_record
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+
           const { data: activeSession } = await supabase
-            .from("time_sessions")
+            .from("clock_in_records")
             .select("*")
-            .eq("user_id", userProfile.id)
-            .is("clock_out", null)
-            .order("clock_in", { ascending: false })
+            .eq("employee_id", employee.id)
+            .eq("status", "clocked_in")
+            .gte("clock_in_time", today.toISOString())
+            .lt("clock_in_time", tomorrow.toISOString())
+            .order("clock_in_time", { ascending: false })
             .limit(1)
             .maybeSingle();
-          
+
           return {
             ...userProfile,
             activeSession
           };
         })
       );
-      
+
       setAllUsers(usersWithSessions);
     }
   };
@@ -420,48 +328,48 @@ const Dashboard = () => {
   };
 
   const handleClockIn = async () => {
-    if (!user) return;
+    if (!user || !user.email) return;
 
     setLoading(true);
     try {
-      // First check if there's already an active session
-      const { data: existingSession } = await supabase
-        .from("time_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .is("clock_out", null)
-        .order("clock_in", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Check if already clocked in via clock_in_records
+      if (employeeId) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
 
-      if (existingSession) {
-        toast({ title: "Already Clocked In", description: "You already have an active session", variant: "destructive" });
-        setLoading(false);
-        return;
+        const { data: existingSession } = await supabase
+          .from("clock_in_records")
+          .select("*")
+          .eq("employee_id", employeeId)
+          .eq("status", "clocked_in")
+          .gte("clock_in_time", today.toISOString())
+          .lt("clock_in_time", tomorrow.toISOString())
+          .maybeSingle();
+
+        if (existingSession) {
+          toast({ title: "Already Clocked In", description: "You already have an active session", variant: "destructive" });
+          setLoading(false);
+          return;
+        }
       }
 
-      // Try to insert directly first
-      const { error } = await supabase
-        .from("time_sessions")
-        .insert({ user_id: user.id, clock_in: new Date().toISOString() });
+      // Call manual-clock-in API which will use clock_in_records
+      const baseUrl =
+        typeof window !== 'undefined' && window.location.origin?.includes('localhost')
+          ? 'https://work-timer-hub.vercel.app'
+          : window.location.origin || 'https://work-timer-hub.vercel.app';
 
-      if (error) {
-        // Fallback: call backend with service role to bypass RLS issues
-        const baseUrl =
-          typeof window !== 'undefined' && window.location.origin?.includes('localhost')
-            ? 'https://work-timer-hub.vercel.app'
-            : window.location.origin || 'https://work-timer-hub.vercel.app';
+      const resp = await fetch(`${baseUrl}/api/manual-clock-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email })
+      });
 
-        const resp = await fetch(`${baseUrl}/api/manual-clock-in`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: user.id })
-        });
-
-        if (!resp.ok) {
-          const txt = await resp.text();
-          throw new Error(txt || 'Failed to clock in');
-        }
+      if (!resp.ok) {
+        const txt = await resp.text();
+        throw new Error(txt || 'Failed to clock in');
       }
 
       toast({ title: "Clocked In", description: "Your work session has started" });
@@ -473,104 +381,34 @@ const Dashboard = () => {
   };
 
   const handleClockOut = async () => {
-    if (!user || !activeSession) return;
+    if (!user || !activeSession || !user.email) return;
 
-    // Handle Salesforce-managed clock-ins (clock_in_records)
-    if (activeSession.source === "clock_in_records") {
-      setLoading(true);
-      try {
-        const baseUrl =
-          typeof window !== 'undefined' && window.location.origin?.includes('localhost')
-            ? 'https://work-timer-hub.vercel.app'
-            : window.location.origin || 'https://work-timer-hub.vercel.app';
-
-        const response = await fetch(`${baseUrl}/api/clock-out`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: user.email }),
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(text || 'Failed to clock out');
-        }
-
-        toast({ title: 'Clocked Out', description: 'Your work session has ended' });
-
-        // Persist to time_sessions history for the user so records appear in history
-        try {
-          const nowIso = new Date().toISOString();
-          const clockInIso = activeSession.clock_in_time || activeSession.clock_in || nowIso;
-
-          // Fetch the updated record to get the final break_seconds (in case user was paused when clocking out)
-          const { data: updatedRecord } = await supabase
-            .from('clock_in_records')
-            .select('break_seconds')
-            .eq('id', activeSession.id)
-            .single();
-
-          const finalBreakSeconds = updatedRecord?.break_seconds || activeSession.break_seconds || 0;
-
-          await supabase
-            .from('time_sessions')
-            .insert({
-              user_id: user.id,
-              clock_in: clockInIso,
-              clock_out: nowIso,
-              break_seconds: finalBreakSeconds
-            });
-        } catch (e) {
-          console.error('Failed to persist time_sessions history:', e);
-        }
-
-        await fetchActiveSession(user.id, employeeId);
-      } catch (err: any) {
-        console.error('[Clock Out] API failed:', err);
-        toast({ title: 'Error', description: err?.message || 'Failed to clock out', variant: 'destructive' });
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // Handle regular time_sessions
     setLoading(true);
-    const clockOutTime = new Date().toISOString();
-    const { error } = await supabase
-      .from("time_sessions")
-      .update({
-        clock_out: clockOutTime,
-      })
-      .eq("id", activeSession.id);
+    try {
+      const baseUrl =
+        typeof window !== 'undefined' && window.location.origin?.includes('localhost')
+          ? 'https://work-timer-hub.vercel.app'
+          : window.location.origin || 'https://work-timer-hub.vercel.app';
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to clock out",
-        variant: "destructive",
+      const response = await fetch(`${baseUrl}/api/clock-out`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
       });
-    } else {
-      if (activeSession.clockInRecordId) {
-        const { error: clockInRecordError } = await supabase
-          .from("clock_in_records")
-          .update({
-            status: "clocked_out",
-            clock_out_time: clockOutTime,
-          })
-          .eq("id", activeSession.clockInRecordId);
 
-        if (clockInRecordError) {
-          console.error("Failed to update clock-in record status:", clockInRecordError);
-        }
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || 'Failed to clock out');
       }
 
-      toast({
-        title: "Clocked Out",
-        description: "Your work session has ended",
-      });
+      toast({ title: 'Clocked Out', description: 'Your work session has ended' });
       await fetchActiveSession(user.id, employeeId);
+    } catch (err: any) {
+      console.error('[Clock Out] API failed:', err);
+      toast({ title: 'Error', description: err?.message || 'Failed to clock out', variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handlePause = async () => {
@@ -800,10 +638,8 @@ const Dashboard = () => {
     }
   };
 
-  const isTimeSession = activeSession?.source === "time_sessions";
-  const clockInTimestamp = activeSession
-    ? (isTimeSession ? activeSession.clock_in : activeSession.clock_in_time)
-    : null;
+  // All sessions now use clock_in_time field
+  const clockInTimestamp = activeSession?.clock_in_time;
 
   const formatClockIn = (timestamp?: string | null) => {
     if (!timestamp) return null;
@@ -829,10 +665,8 @@ const Dashboard = () => {
 
   console.log('[Dashboard] Render state', {
     activeSession: !!activeSession,
-    source: activeSession?.source,
     paused_at: activeSession?.paused_at,
-    isPaused,
-    isTimeSession
+    isPaused
   });
 
   if (!user || !profile) {
@@ -877,78 +711,38 @@ const Dashboard = () => {
                       </span>
                     </div>
                   )}
-                  {isTimeSession ? (
-                    <>
-                      <Button
-                        onClick={handleClockOut}
-                        disabled={loading}
-                        variant="destructive"
-                        size="lg"
-                        className="w-full"
-                      >
-                        <StopCircle className="mr-2 h-5 w-5" />
-                        Clock Out
-                      </Button>
-                      {activeSession.paused_at ? (
-                        <Button
-                          onClick={handleResume}
-                          disabled={loading}
-                          variant="secondary"
-                          size="lg"
-                          className="w-full"
-                        >
-                          <Play className="mr-2 h-5 w-5" />
-                          Resume from Lunch Break
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={handlePause}
-                          disabled={loading}
-                          variant="outline"
-                          size="lg"
-                          className="w-full"
-                        >
-                          <PauseCircle className="mr-2 h-5 w-5" />
-                          Pause for Lunch Break
-                        </Button>
-                      )}
-                    </>
+                  <Button
+                    onClick={handleClockOut}
+                    disabled={loading}
+                    variant="destructive"
+                    size="lg"
+                    className="w-full"
+                  >
+                    <StopCircle className="mr-2 h-5 w-5" />
+                    Clock Out
+                  </Button>
+                  {activeSession.paused_at ? (
+                    <Button
+                      onClick={handleResumeClockInRecord}
+                      disabled={loading}
+                      variant="secondary"
+                      size="lg"
+                      className="w-full"
+                    >
+                      <Play className="mr-2 h-5 w-5" />
+                      Resume from Lunch Break
+                    </Button>
                   ) : (
-                    <>
-                      <Button
-                        onClick={handleClockOut}
-                        disabled={loading}
-                        variant="destructive"
-                        size="lg"
-                        className="w-full"
-                      >
-                        <StopCircle className="mr-2 h-5 w-5" />
-                        Clock Out
-                      </Button>
-                      {activeSession.paused_at ? (
-                        <Button
-                          onClick={handleResumeClockInRecord}
-                          disabled={loading}
-                          variant="secondary"
-                          size="lg"
-                          className="w-full"
-                        >
-                          <Play className="mr-2 h-5 w-5" />
-                          Resume from Lunch Break
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={handlePauseClockInRecord}
-                          disabled={loading}
-                          variant="outline"
-                          size="lg"
-                          className="w-full"
-                        >
-                          <PauseCircle className="mr-2 h-5 w-5" />
-                          Pause for Lunch Break
-                        </Button>
-                      )}
-                    </>
+                    <Button
+                      onClick={handlePauseClockInRecord}
+                      disabled={loading}
+                      variant="outline"
+                      size="lg"
+                      className="w-full"
+                    >
+                      <PauseCircle className="mr-2 h-5 w-5" />
+                      Pause for Lunch Break
+                    </Button>
                   )}
                 </>
               ) : (

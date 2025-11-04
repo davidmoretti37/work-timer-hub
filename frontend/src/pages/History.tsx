@@ -55,15 +55,54 @@ const History = () => {
   };
 
   const fetchSessions = async (userId: string) => {
+    // Get user's email to lookup employee_id
+    const { data: authUser } = await supabase.auth.getUser();
+    const userEmail = authUser?.user?.email;
+
+    if (!userEmail) {
+      console.error('No user email found');
+      return;
+    }
+
+    // Get employee record
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("email", userEmail.toLowerCase().trim())
+      .maybeSingle();
+
+    if (!employee) {
+      // No employee record yet, show empty state
+      setSessions([]);
+      setTotalHours(0);
+      return;
+    }
+
+    // Fetch clock_in_records for this employee
     const { data } = await supabase
-      .from("time_sessions")
+      .from("clock_in_records")
       .select("*")
-      .eq("user_id", userId)
-      .order("clock_in", { ascending: false });
-    
+      .eq("employee_id", employee.id)
+      .order("clock_in_time", { ascending: false });
+
     if (data) {
-      setSessions(data);
-      const total = data.reduce((sum, session) => sum + (session.hours_worked || 0), 0);
+      // Transform to match expected format for SessionCard
+      const transformedSessions = data.map((record: any) => ({
+        id: record.id,
+        clock_in: record.clock_in_time,
+        clock_out: record.clock_out_time,
+        paused_at: record.paused_at,
+        break_seconds: record.break_seconds,
+        break_end: record.break_end,
+        // Calculate hours_worked from clock_in_time and clock_out_time
+        hours_worked: record.clock_out_time
+          ? (new Date(record.clock_out_time).getTime() - new Date(record.clock_in_time).getTime()) / (1000 * 60 * 60) -
+            (record.break_seconds || 0) / 3600
+          : null
+      }));
+
+      setSessions(transformedSessions);
+      const total = transformedSessions.reduce((sum, session) => sum + (session.hours_worked || 0), 0);
       setTotalHours(total);
     }
   };

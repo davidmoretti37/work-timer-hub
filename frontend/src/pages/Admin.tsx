@@ -96,46 +96,67 @@ const Admin = () => {
   };
 
   const fetchAllSessions = async () => {
+    // Fetch all clock_in_records with employee info
     const { data: sessionsData } = await supabase
-      .from("time_sessions")
-      .select("*, break_end")
-      .order("clock_in", { ascending: false });
-    
+      .from("clock_in_records")
+      .select("*, employees(email, name, id)")
+      .order("clock_in_time", { ascending: false});
+
     if (sessionsData) {
-      setSessions(sessionsData);
-      
-      // Fetch profiles for all users
-      const userIds = [...new Set(sessionsData.map(s => s.user_id))];
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("id", userIds);
-      
-      if (profilesData) {
-        const profileMap = new Map(profilesData.map(p => [p.id, p]));
-        setProfiles(profileMap);
-        console.log("Profiles loaded:", profileMap);
-        console.log("Sessions:", sessionsData);
-        
-        // Debug missing profiles
-        const sessionsWithoutProfiles = sessionsData.filter(s => !profileMap.has(s.user_id));
-        if (sessionsWithoutProfiles.length > 0) {
-          console.warn("Sessions without profiles:", sessionsWithoutProfiles);
-          console.warn("Missing profile user IDs:", sessionsWithoutProfiles.map(s => s.user_id));
-          
-          // Only try to create missing profiles if we haven't attempted for these users already
-          const newMissingUserIds = sessionsWithoutProfiles
-            .map(s => s.user_id)
-            .filter(userId => !profileCreationAttempted.has(userId));
-          
-          if (newMissingUserIds.length > 0) {
-            console.log("Will attempt to create profiles for new missing users:", newMissingUserIds);
-            await createMissingProfiles(newMissingUserIds);
-          } else {
-            console.log("Already attempted profile creation for all missing users");
+      // Transform to match expected format
+      const transformedSessions = sessionsData.map((record: any) => ({
+        id: record.id,
+        user_id: record.user_id || record.employee_id, // Use employee_id as fallback
+        clock_in: record.clock_in_time,
+        clock_out: record.clock_out_time,
+        paused_at: record.paused_at,
+        break_seconds: record.break_seconds,
+        break_end: record.break_end,
+        employee_email: record.employees?.email,
+        employee_name: record.employees?.name,
+        // Calculate hours_worked from clock_in_time and clock_out_time
+        hours_worked: record.clock_out_time
+          ? (new Date(record.clock_out_time).getTime() - new Date(record.clock_in_time).getTime()) / (1000 * 60 * 60) -
+            (record.break_seconds || 0) / 3600
+          : null
+      }));
+
+      setSessions(transformedSessions);
+
+      // Map employees to profiles by email
+      const uniqueEmails = [...new Set(transformedSessions.map((s: any) => s.employee_email).filter(Boolean))];
+
+      // Get auth users by email to get their user_id
+      const profileMap = new Map();
+      for (const email of uniqueEmails) {
+        const { data: authUsers } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", (await supabase.auth.admin.getUserById(email as string))?.data?.user?.id)
+          .maybeSingle();
+
+        if (authUsers) {
+          // Use employee_email as the key since we don't have guaranteed user_id linkage yet
+          const matchingSession = transformedSessions.find((s: any) => s.employee_email === email);
+          if (matchingSession) {
+            profileMap.set(matchingSession.user_id, authUsers);
+          }
+        } else {
+          // Create a synthetic profile from employee data
+          const matchingSession = transformedSessions.find((s: any) => s.employee_email === email);
+          if (matchingSession) {
+            profileMap.set(matchingSession.user_id, {
+              id: matchingSession.user_id,
+              full_name: matchingSession.employee_name || email,
+              admin_display_name: null
+            });
           }
         }
       }
+
+      setProfiles(profileMap);
+      console.log("Profiles loaded:", profileMap);
+      console.log("Sessions:", transformedSessions);
     }
 
     await fetchEmployeeActivity();
@@ -355,8 +376,8 @@ const Admin = () => {
   const handleUpdateSession = async (sessionId: string, clockIn: string, clockOut: string | null, breakStart?: string | null, breakEnd?: string | null) => {
     try {
       const updateData: any = {
-        clock_in: clockIn,
-        clock_out: clockOut,
+        clock_in_time: clockIn,
+        clock_out_time: clockOut,
       };
 
       // Update break start and end times if provided
@@ -368,7 +389,7 @@ const Admin = () => {
       }
 
       const { error } = await supabase
-        .from("time_sessions")
+        .from("clock_in_records")
         .update(updateData)
         .eq("id", sessionId);
 
@@ -393,7 +414,7 @@ const Admin = () => {
   const handleDeleteSession = async (sessionId: string) => {
     try {
       const { error } = await supabase
-        .from("time_sessions")
+        .from("clock_in_records")
         .delete()
         .eq("id", sessionId);
 
