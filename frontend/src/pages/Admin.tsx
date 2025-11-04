@@ -185,22 +185,22 @@ const Admin = () => {
     await fetchEmployeeActivity();
   };
 
-  // Keep selected users in sync with available users; default to all
+  // Keep selected users in sync with available users
+  // Note: No longer auto-selects all users on page load - admin must manually select
   useEffect(() => {
+    // Only clean up selectedUserIds if a user was removed from sessions
     const allUserIds = new Set(sessions.map(s => s.user_id));
-    // If nothing selected yet, or new users appeared, include them
-    if (selectedUserIds.size === 0) {
-      setSelectedUserIds(allUserIds);
-      return;
-    }
-    let changed = false;
     const next = new Set(selectedUserIds);
-    for (const id of allUserIds) {
-      if (!next.has(id)) {
-        next.add(id);
+    let changed = false;
+
+    // Remove any selected user that no longer exists in sessions
+    for (const id of selectedUserIds) {
+      if (!allUserIds.has(id)) {
+        next.delete(id);
         changed = true;
       }
     }
+
     if (changed) setSelectedUserIds(next);
   }, [sessions]);
 
@@ -402,6 +402,13 @@ const Admin = () => {
         clock_in_time: clockIn,
         clock_out_time: clockOut,
       };
+
+      // Update status based on clock_out_time
+      if (clockOut) {
+        updateData.status = 'clocked_out';
+      } else {
+        updateData.status = 'clocked_in';
+      }
 
       // Update break start and end times if provided
       if (breakStart !== undefined) {
