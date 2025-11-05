@@ -74,6 +74,25 @@ export default async function handler(req: any, res: any) {
       return res.status(200).json({ success: true, message: 'Already clocked in', session: existing[0] });
     }
 
+    // Check if user already clocked out today - prevent re-clocking in same day
+    const { data: endedToday } = await supabase
+      .from('clock_in_records')
+      .select('id, clock_in_time, clock_out_time, status')
+      .eq('employee_id', employeeId)
+      .gte('clock_in_time', today.toISOString())
+      .lt('clock_in_time', tomorrow.toISOString())
+      .order('clock_in_time', { ascending: false })
+      .limit(1);
+
+    if (endedToday && endedToday.length > 0 && endedToday[0].status === 'clocked_out') {
+      return res.status(400).json({
+        success: false,
+        error: 'ALREADY_CLOCKED_OUT',
+        message: 'You have already clocked out for today. If you need to adjust your time, please contact your administrator.',
+        session: endedToday[0]
+      });
+    }
+
     // Create new clock-in record (user_id will be set by database trigger)
     const { data, error } = await supabase
       .from('clock_in_records')

@@ -343,9 +343,25 @@ const Dashboard = () => {
         body: JSON.stringify({ email: user.email })
       });
 
+      const data = await resp.json();
+
       if (!resp.ok) {
-        const txt = await resp.text();
-        throw new Error(txt || 'Failed to clock in');
+        // Handle specific error cases
+        if (data.error === 'ALREADY_CLOCKED_OUT') {
+          toast({
+            title: "Cannot Clock In",
+            description: data.message || "You have already clocked out for today. Please contact your administrator if you need to adjust your time.",
+            variant: 'destructive'
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: data.message || data.error || 'Failed to clock in',
+            variant: 'destructive'
+          });
+        }
+        setLoading(false);
+        return;
       }
 
       toast({ title: "Clocked In", description: "Your work session has started" });

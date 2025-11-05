@@ -102,7 +102,7 @@ export default async function handler(req: any, res: any) {
     if (endedToday && endedToday.length > 0 && endedToday[0].status === 'clocked_out') {
       return res.status(200).json({
         success: true,
-        message: 'Already clocked out today',
+        message: 'Already clocked out today - cannot clock in again',
         employee_id: employee.id,
         clock_in_time: endedToday[0].clock_in_time,
       });
@@ -110,15 +110,11 @@ export default async function handler(req: any, res: any) {
 
     const clockInTimeIso = (providedLoginTime ?? new Date()).toISOString();
 
-    // Get the auth user_id from the employee email
-    const { data: authUser } = await supabase.auth.admin.listUsers();
-    const user = authUser?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
-
+    // Create new clock-in record (user_id will be set by database trigger)
     const { data: clockIn, error: clockError } = await supabase
       .from('clock_in_records')
       .insert({
         employee_id: employee.id,
-        user_id: user?.id || null,
         clock_in_time: clockInTimeIso,
         status: 'clocked_in',
       })
