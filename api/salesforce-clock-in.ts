@@ -90,7 +90,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // If user already clocked out today, do NOT auto clock them back in
-    const { data: endedToday } = await supabase
+    const { data: endedToday, error: endedError } = await supabase
       .from('clock_in_records')
       .select('id, clock_in_time, clock_out_time, status')
       .eq('employee_id', employee.id)
@@ -99,7 +99,16 @@ export default async function handler(req: any, res: any) {
       .order('clock_in_time', { ascending: false })
       .limit(1);
 
+    if (endedError) {
+      console.error('[salesforce-clock-in] Error checking clocked-out status:', endedError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to verify clock-out status - preventing duplicate clock-in'
+      });
+    }
+
     if (endedToday && endedToday.length > 0 && endedToday[0].status === 'clocked_out') {
+      console.log('[salesforce-clock-in] User already clocked out today, rejecting clock-in:', normalizedEmail);
       return res.status(200).json({
         success: true,
         message: 'Already clocked out today - cannot clock in again',
