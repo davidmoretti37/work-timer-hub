@@ -157,23 +157,19 @@ serve(async (req) => {
       // Idempotent clock-in for current UTC day
       // Check if ANY clock-in record exists today (clocked_in OR clocked_out)
       // to prevent auto-clocking back in after the user has clocked out
+      // Atomic insert: Let the database unique index prevent duplicates
       const today = new Date().toISOString().split("T")[0];
-      const { data: existingClockIn, error: existingErr } = await supabase
+      const { error: clockInError } = await supabase
         .from("clock_in_records")
-        .select("id, status")
-        .eq("employee_id", employee.id)
-        .gte("clock_in_time", `${today}T00:00:00Z`)
-        .maybeSingle();
-      if (existingErr && existingErr.code !== "PGRST116") {
-        // ignore no rows code; proceed otherwise
-        console.error("Clock-in lookup error", existingErr);
-      }
+        .insert({ employee_id: employee.id, status: "clocked_in" });
 
-      if (!existingClockIn) {
-        const { error: clockInError } = await supabase
-          .from("clock_in_records")
-          .insert({ employee_id: employee.id, status: "clocked_in" });
-        if (clockInError) {
+      // Handle unique constraint violation (duplicate clock-in)
+      if (clockInError) {
+        // PostgreSQL error code 23505 = unique_violation
+        if (clockInError.code === '23505' || clockInError.message?.includes('unique_active_clock_in_per_employee_per_day')) {
+          console.log('[salesforce-oauth callback] Duplicate clock-in prevented by database constraint');
+          // Continue silently - user is already clocked in
+        } else {
           throw new Error(`Failed to clock in: ${clockInError.message}`);
         }
       }
@@ -273,21 +269,18 @@ serve(async (req) => {
 
         if (!employeeId) return false;
 
-        // Check if ANY clock-in record exists today (clocked_in OR clocked_out)
-        // to prevent auto-clocking back in after the user has clocked out
-        const today = new Date().toISOString().split("T")[0];
-        const { data: existingClockIn } = await supabase
+        // Atomic insert: Let the database unique index prevent duplicates
+        const { error: clockInError } = await supabase
           .from("clock_in_records")
-          .select("id, status")
-          .eq("employee_id", employeeId)
-          .gte("clock_in_time", `${today}T00:00:00Z`)
-          .maybeSingle();
+          .insert({ employee_id: employeeId, status: "clocked_in" });
 
-        if (!existingClockIn) {
-          const { error: clockInError } = await supabase
-            .from("clock_in_records")
-            .insert({ employee_id: employeeId, status: "clocked_in" });
-          if (clockInError) {
+        // Handle unique constraint violation (duplicate clock-in)
+        if (clockInError) {
+          // PostgreSQL error code 23505 = unique_violation
+          if (clockInError.code === '23505' || clockInError.message?.includes('unique_active_clock_in_per_employee_per_day')) {
+            console.log('[salesforce-oauth webhook] Duplicate clock-in prevented by database constraint');
+            // Continue silently - user is already clocked in
+          } else {
             throw new Error(`Clock-in error: ${clockInError.message}`);
           }
         }

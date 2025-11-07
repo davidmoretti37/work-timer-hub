@@ -56,40 +56,7 @@ export default async function handler(req: any, res: any) {
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-    // Check if user is already clocked in today
-    const { data: existing } = await supabase
-      .from('clock_in_records')
-      .select('id, clock_in_time')
-      .eq('employee_id', employee.id)
-      .gte('clock_in_time', today.toISOString())
-      .lt('clock_in_time', tomorrow.toISOString())
-      .eq('status', 'clocked_in')
-      .limit(1);
-
-    if (existing && existing.length > 0) {
-      const existingRecord = existing[0];
-
-      if (providedLoginTime && existingRecord.clock_in_time) {
-        const existingTime = new Date(existingRecord.clock_in_time);
-        if (!Number.isNaN(existingTime.getTime()) && existingTime > providedLoginTime) {
-          const updatedTimeIso = providedLoginTime.toISOString();
-          await supabase
-            .from('clock_in_records')
-            .update({ clock_in_time: updatedTimeIso })
-            .eq('id', existingRecord.id);
-          existingRecord.clock_in_time = updatedTimeIso;
-        }
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: 'Already clocked in today',
-        employee_id: employee.id,
-        clock_in_time: existing[0].clock_in_time,
-      });
-    }
-
-    // If user already clocked out today, do NOT auto clock them back in
+    // Check if user already clocked out today - do NOT auto clock them back in
     const { data: endedToday, error: endedError } = await supabase
       .from('clock_in_records')
       .select('id, clock_in_time, clock_out_time, status')
@@ -119,7 +86,8 @@ export default async function handler(req: any, res: any) {
 
     const clockInTimeIso = (providedLoginTime ?? new Date()).toISOString();
 
-    // Create new clock-in record (user_id will be set by database trigger)
+    // Atomic insert: Let the database unique index prevent duplicates
+    // If duplicate, catch the error and return the existing record
     const { data: clockIn, error: clockError } = await supabase
       .from('clock_in_records')
       .insert({
@@ -130,7 +98,49 @@ export default async function handler(req: any, res: any) {
       .select()
       .single();
 
-    if (clockError || !clockIn) {
+    // Handle unique constraint violation (duplicate clock-in)
+    if (clockError) {
+      // PostgreSQL error code 23505 = unique_violation
+      if (clockError.code === '23505' || clockError.message?.includes('unique_active_clock_in_per_employee_per_day')) {
+        console.log('[salesforce-clock-in] Duplicate clock-in prevented by database constraint:', normalizedEmail);
+
+        // Fetch the existing record
+        const { data: existing } = await supabase
+          .from('clock_in_records')
+          .select('id, clock_in_time')
+          .eq('employee_id', employee.id)
+          .gte('clock_in_time', today.toISOString())
+          .lt('clock_in_time', tomorrow.toISOString())
+          .eq('status', 'clocked_in')
+          .single();
+
+        if (existing) {
+          // Update to earlier time if provided login time is earlier
+          if (providedLoginTime && existing.clock_in_time) {
+            const existingTime = new Date(existing.clock_in_time);
+            if (!Number.isNaN(existingTime.getTime()) && existingTime > providedLoginTime) {
+              const updatedTimeIso = providedLoginTime.toISOString();
+              await supabase
+                .from('clock_in_records')
+                .update({ clock_in_time: updatedTimeIso })
+                .eq('id', existing.id);
+              existing.clock_in_time = updatedTimeIso;
+            }
+          }
+
+          return res.status(200).json({
+            success: true,
+            message: 'Already clocked in today',
+            employee_id: employee.id,
+            clock_in_time: existing.clock_in_time,
+          });
+        }
+      }
+
+      return res.status(500).json({ success: false, error: 'Failed to create clock-in' });
+    }
+
+    if (!clockIn) {
       return res.status(500).json({ success: false, error: 'Failed to create clock-in' });
     }
 

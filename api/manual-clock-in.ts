@@ -60,20 +60,6 @@ export default async function handler(req: any, res: any) {
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
-    const { data: existing } = await supabase
-      .from('clock_in_records')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .eq('status', 'clocked_in')
-      .gte('clock_in_time', today.toISOString())
-      .lt('clock_in_time', tomorrow.toISOString())
-      .order('clock_in_time', { ascending: false })
-      .limit(1);
-
-    if (existing && existing.length > 0) {
-      return res.status(200).json({ success: true, message: 'Already clocked in', session: existing[0] });
-    }
-
     // Check if user already clocked out today - prevent re-clocking in same day
     const { data: endedToday } = await supabase
       .from('clock_in_records')
@@ -93,7 +79,8 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Create new clock-in record (user_id will be set by database trigger)
+    // Atomic insert: Let the database unique index prevent duplicates
+    // If duplicate, catch the error and return the existing record
     const { data, error } = await supabase
       .from('clock_in_records')
       .insert({
@@ -104,7 +91,30 @@ export default async function handler(req: any, res: any) {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ success: false, error: error.message });
+    // Handle unique constraint violation (duplicate clock-in)
+    if (error) {
+      // PostgreSQL error code 23505 = unique_violation
+      if (error.code === '23505' || error.message?.includes('unique_active_clock_in_per_employee_per_day')) {
+        console.log('[manual-clock-in] Duplicate clock-in prevented by database constraint:', normalizedEmail);
+
+        // Fetch the existing record
+        const { data: existing } = await supabase
+          .from('clock_in_records')
+          .select('*')
+          .eq('employee_id', employeeId)
+          .eq('status', 'clocked_in')
+          .gte('clock_in_time', today.toISOString())
+          .lt('clock_in_time', tomorrow.toISOString())
+          .order('clock_in_time', { ascending: false })
+          .single();
+
+        if (existing) {
+          return res.status(200).json({ success: true, message: 'Already clocked in', session: existing });
+        }
+      }
+
+      return res.status(500).json({ success: false, error: error.message });
+    }
 
     return res.status(200).json({ success: true, session: data });
   } catch (e: any) {
