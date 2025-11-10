@@ -34,10 +34,11 @@ export default async function handler(
     }
 
     // Check if already clocked in today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Use UTC day boundaries to match API behavior
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
     const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
     const { data: existing } = await supabase
       .from('clock_in_records')

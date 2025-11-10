@@ -152,10 +152,11 @@ const Dashboard = () => {
     // Query clock_in_records for active session
     // Use user_id if available, otherwise fallback to employee_id
     if (currentEmployeeId) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Use UTC day boundaries to match API behavior
+      const now = new Date();
+      const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
       const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
       const { data: clockInRecord, error: clockInError } = await supabase
         .from("clock_in_records")
@@ -206,10 +207,11 @@ const Dashboard = () => {
       const usersWithSessions = await Promise.all(
         data.map(async (userProfile) => {
           // Get active clock_in_record directly using user_id
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
+          // Use UTC day boundaries to match API behavior
+          const now = new Date();
+          const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
           const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
+          tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
           const { data: activeSession } = await supabase
             .from("clock_in_records")
@@ -310,10 +312,11 @@ const Dashboard = () => {
     try {
       // Check if already clocked in via clock_in_records
       if (employeeId) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Use UTC day boundaries to match API behavior
+        const now = new Date();
+        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
         const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
         const { data: existingSession } = await supabase
           .from("clock_in_records")
