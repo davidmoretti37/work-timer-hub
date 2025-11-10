@@ -311,24 +311,24 @@ const Dashboard = () => {
     setLoading(true);
     try {
       // Check if already clocked in via clock_in_records
+      // Look for ANY active session, not just today's (to catch stuck sessions from previous days)
       if (employeeId) {
-        // Use UTC day boundaries to match API behavior
-        const now = new Date();
-        const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-        const tomorrow = new Date(today);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-
         const { data: existingSession } = await supabase
           .from("clock_in_records")
           .select("*")
           .eq("employee_id", employeeId)
           .eq("status", "clocked_in")
-          .gte("clock_in_time", today.toISOString())
-          .lt("clock_in_time", tomorrow.toISOString())
+          .order("clock_in_time", { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         if (existingSession) {
-          toast({ title: "Already Clocked In", description: "You already have an active session", variant: "destructive" });
+          const clockInDate = new Date(existingSession.clock_in_time).toLocaleString();
+          toast({
+            title: "Already Clocked In",
+            description: `You have an active session from ${clockInDate}. Please clock out first.`,
+            variant: "destructive"
+          });
           setLoading(false);
           return;
         }

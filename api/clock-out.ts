@@ -44,19 +44,12 @@ export default async function handler(req: any, res: any) {
       return res.status(404).json({ success: false, error: 'Employee not found' });
     }
 
-    // Use UTC day boundaries
-    const now = new Date();
-    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-    const tomorrow = new Date(today);
-    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-
-    // Get today's active record
+    // Find ANY active clock-in record for this employee (not restricted by date)
+    // This handles users in negative UTC timezones who clock in one UTC day and clock out the next
     const { data: record, error: recErr } = await supabase
       .from('clock_in_records')
-      .select('id, status')
+      .select('id, status, clock_in_time')
       .eq('employee_id', employee.id)
-      .gte('clock_in_time', today.toISOString())
-      .lt('clock_in_time', tomorrow.toISOString())
       .eq('status', 'clocked_in')
       .order('clock_in_time', { ascending: false })
       .limit(1)
