@@ -60,6 +60,34 @@ export default async function handler(req: any, res: any) {
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
+    // First check for ANY active session (could be from yesterday if it failed to clock out)
+    const { data: activeSession, error: activeError } = await supabase
+      .from('clock_in_records')
+      .select('id, clock_in_time, status')
+      .eq('employee_id', employeeId)
+      .eq('status', 'clocked_in')
+      .order('clock_in_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeError) {
+      console.error('[manual-clock-in] Error checking active session:', activeError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to verify active session'
+      });
+    }
+
+    // If there's an active session, return it instead of creating a new one
+    if (activeSession) {
+      console.log('[manual-clock-in] Active session already exists:', normalizedEmail);
+      return res.status(200).json({
+        success: true,
+        message: 'Already clocked in',
+        session: activeSession
+      });
+    }
+
     // Check if user already clocked out today - prevent re-clocking in same day
     const { data: endedToday } = await supabase
       .from('clock_in_records')
@@ -97,16 +125,15 @@ export default async function handler(req: any, res: any) {
       if (error.code === '23505' || error.message?.includes('unique_active_clock_in_per_employee_per_day')) {
         console.log('[manual-clock-in] Duplicate clock-in prevented by database constraint:', normalizedEmail);
 
-        // Fetch the existing record
+        // Fetch ANY existing active record (could be from previous day if stuck)
         const { data: existing } = await supabase
           .from('clock_in_records')
           .select('*')
           .eq('employee_id', employeeId)
           .eq('status', 'clocked_in')
-          .gte('clock_in_time', today.toISOString())
-          .lt('clock_in_time', tomorrow.toISOString())
           .order('clock_in_time', { ascending: false })
-          .single();
+          .limit(1)
+          .maybeSingle();
 
         if (existing) {
           return res.status(200).json({ success: true, message: 'Already clocked in', session: existing });

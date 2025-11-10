@@ -56,6 +56,35 @@ export default async function handler(req: any, res: any) {
     const tomorrow = new Date(today);
     tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
+    // First check for ANY active session (could be from yesterday if it failed to clock out)
+    const { data: activeSession, error: activeError } = await supabase
+      .from('clock_in_records')
+      .select('id, clock_in_time, status')
+      .eq('employee_id', employee.id)
+      .eq('status', 'clocked_in')
+      .order('clock_in_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeError) {
+      console.error('[salesforce-clock-in] Error checking active session:', activeError);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to verify active session'
+      });
+    }
+
+    // If there's an active session, don't create a new one
+    if (activeSession) {
+      console.log('[salesforce-clock-in] Active session already exists:', normalizedEmail);
+      return res.status(200).json({
+        success: true,
+        message: 'Already clocked in',
+        employee_id: employee.id,
+        clock_in_time: activeSession.clock_in_time,
+      });
+    }
+
     // Check if user already clocked out today - do NOT auto clock them back in
     const { data: endedToday, error: endedError } = await supabase
       .from('clock_in_records')
@@ -104,15 +133,15 @@ export default async function handler(req: any, res: any) {
       if (clockError.code === '23505' || clockError.message?.includes('unique_active_clock_in_per_employee_per_day')) {
         console.log('[salesforce-clock-in] Duplicate clock-in prevented by database constraint:', normalizedEmail);
 
-        // Fetch the existing record
+        // Fetch ANY existing active record (could be from any day)
         const { data: existing } = await supabase
           .from('clock_in_records')
           .select('id, clock_in_time')
           .eq('employee_id', employee.id)
-          .gte('clock_in_time', today.toISOString())
-          .lt('clock_in_time', tomorrow.toISOString())
           .eq('status', 'clocked_in')
-          .single();
+          .order('clock_in_time', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         if (existing) {
           // Update to earlier time if provided login time is earlier
