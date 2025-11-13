@@ -115,6 +115,35 @@ export default async function handler(req: any, res: any) {
 
     const clockInTimeIso = (providedLoginTime ?? new Date()).toISOString();
 
+    // Check if a record already exists with this EXACT clock-in timestamp
+    // This prevents the DailyClockInBackfill scheduled job from creating duplicates
+    const { data: existingTimestamp, error: timestampError } = await supabase
+      .from('clock_in_records')
+      .select('id, clock_in_time, status, clock_out_time')
+      .eq('employee_id', employee.id)
+      .eq('clock_in_time', clockInTimeIso)
+      .maybeSingle();
+
+    if (timestampError) {
+      console.error('[salesforce-clock-in] Error checking for existing timestamp:', timestampError);
+      // Continue anyway - database unique constraint will catch it
+    }
+
+    if (existingTimestamp) {
+      console.log('[salesforce-clock-in] Record with exact timestamp already exists:', {
+        email: normalizedEmail,
+        timestamp: clockInTimeIso,
+        status: existingTimestamp.status
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Clock-in record with this timestamp already exists',
+        employee_id: employee.id,
+        clock_in_time: existingTimestamp.clock_in_time,
+        existing: true
+      });
+    }
+
     // Atomic insert: Let the database unique index prevent duplicates
     // If duplicate, catch the error and return the existing record
     const { data: clockIn, error: clockError } = await supabase
