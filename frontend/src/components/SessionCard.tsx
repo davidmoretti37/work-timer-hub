@@ -19,11 +19,13 @@ interface SessionCardProps {
   pausedAt?: string | null;
   breakSeconds?: number | null;
   breakEnd?: string | null;
+  idleSeconds?: number | null;
 }
 
-const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAdmin, onUpdate, onDelete, pausedAt, breakSeconds, breakEnd }: SessionCardProps) => {
+const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAdmin, onUpdate, onDelete, pausedAt, breakSeconds, breakEnd, idleSeconds }: SessionCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const showBreakInfo = pausedAt || (breakSeconds && breakSeconds > 0);
+  const showIdleInfo = idleSeconds && idleSeconds > 0;
   const [editClockIn, setEditClockIn] = useState('');
   const [editClockOut, setEditClockOut] = useState('');
   const [editBreakStart, setEditBreakStart] = useState('');
@@ -192,6 +194,15 @@ const SessionCard = ({ clockIn, clockOut, hoursWorked, userName, sessionId, isAd
               <div className="text-xs text-muted-foreground mb-1">Break Time</div>
               <div className="text-sm font-semibold text-orange-600 dark:text-orange-400">
                 {formatBreakTime(breakSeconds)}
+              </div>
+            </div>
+          )}
+
+          {showIdleInfo && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Idle Time</div>
+              <div className="text-sm font-semibold text-red-600 dark:text-red-400">
+                {formatBreakTime(idleSeconds)}
               </div>
             </div>
           )}

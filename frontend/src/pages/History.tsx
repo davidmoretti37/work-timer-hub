@@ -94,6 +94,7 @@ const History = () => {
         paused_at: record.paused_at,
         break_seconds: record.break_seconds,
         break_end: record.break_end,
+        idle_seconds: record.idle_seconds,
         // Calculate hours_worked from clock_in_time and clock_out_time
         hours_worked: record.clock_out_time
           ? (new Date(record.clock_out_time).getTime() - new Date(record.clock_in_time).getTime()) / (1000 * 60 * 60) -
@@ -155,6 +156,7 @@ const History = () => {
                   pausedAt={session.paused_at}
                   breakSeconds={session.break_seconds}
                   breakEnd={session.break_end}
+                  idleSeconds={session.idle_seconds}
                 />
               ))
             )}

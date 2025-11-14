@@ -123,6 +123,7 @@ const Admin = () => {
             paused_at: record.paused_at,
             break_seconds: record.break_seconds,
             break_end: record.break_end,
+            idle_seconds: record.idle_seconds,
             employee_email: record.employees?.email,
             employee_name: record.employees?.name,
             hours_worked: record.clock_out_time
@@ -525,17 +526,18 @@ const Admin = () => {
 
       // Sessions detail
       summaryData.push(['Session Details']);
-      summaryData.push(['Date', 'Clock In', 'Clock Out', 'Break Time', 'Hours Worked', 'Status']);
+      summaryData.push(['Date', 'Clock In', 'Clock Out', 'Break Time', 'Idle Time', 'Hours Worked', 'Status']);
 
       userSessions.forEach(session => {
         const date = format(new Date(session.clock_in), 'MMM d, yyyy');
         const clockIn = format(new Date(session.clock_in), 'h:mm a');
         const clockOut = session.clock_out ? format(new Date(session.clock_out), 'h:mm a') : 'Active';
         const breakTime = formatBreakTime(session.break_seconds);
+        const idleTime = formatBreakTime(session.idle_seconds);
         const hours = session.hours_worked ? session.hours_worked.toFixed(2) : '0.00';
         const status = session.clock_out ? 'Completed' : 'In Progress';
 
-        summaryData.push([date, clockIn, clockOut, breakTime, hours, status]);
+        summaryData.push([date, clockIn, clockOut, breakTime, idleTime, hours, status]);
       });
 
       // Create worksheet
@@ -650,7 +652,7 @@ const Admin = () => {
       // Detailed Sessions Sheet
       const detailedData = [];
       detailedData.push(['Detailed Time Sessions']);
-      detailedData.push(['User Name', 'Date', 'Clock In', 'Clock Out', 'Break Time', 'Hours Worked', 'Status']);
+      detailedData.push(['User Name', 'Date', 'Clock In', 'Clock Out', 'Break Time', 'Idle Time', 'Hours Worked', 'Status']);
 
       filteredSessions.forEach(session => {
         const profile = profiles.get(session.user_id);
@@ -659,10 +661,11 @@ const Admin = () => {
         const clockIn = format(new Date(session.clock_in), 'h:mm a');
         const clockOut = session.clock_out ? format(new Date(session.clock_out), 'h:mm a') : 'Active';
         const breakTime = formatBreakTime(session.break_seconds);
+        const idleTime = formatBreakTime(session.idle_seconds);
         const hours = session.hours_worked ? session.hours_worked.toFixed(2) : '0.00';
         const status = session.clock_out ? 'Completed' : 'In Progress';
 
-        detailedData.push([userName, date, clockIn, clockOut, breakTime, hours, status]);
+        detailedData.push([userName, date, clockIn, clockOut, breakTime, idleTime, hours, status]);
       });
 
       // Create detailed worksheet
@@ -970,6 +973,7 @@ const Admin = () => {
                               pausedAt={session.paused_at}
                               breakSeconds={session.break_seconds}
                               breakEnd={session.break_end}
+                              idleSeconds={session.idle_seconds}
                             />
                           ));
                         }
@@ -1002,6 +1006,7 @@ const Admin = () => {
                                     pausedAt={session.paused_at}
                                     breakSeconds={session.break_seconds}
                                     breakEnd={session.break_end}
+                                    idleSeconds={session.idle_seconds}
                                   />
                                 ))}
                               </div>
