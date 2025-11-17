@@ -113,6 +113,12 @@ function promptForEmail() {
 
 // Track activity
 function trackActivity() {
+  // Don't track activity if the idle prompt is showing
+  if (promptElement) {
+    console.log('[Content] Ignoring activity - prompt is showing');
+    return;
+  }
+
   chrome.runtime.sendMessage({
     type: 'ACTIVITY_DETECTED'
   });
@@ -143,15 +149,19 @@ document.addEventListener('scroll', debouncedTrackActivity);
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[Content] Received message:', message);
-  
+
   if (message.type === 'SHOW_IDLE_PROMPT') {
     showIdlePrompt();
     sendResponse({ success: true });
   } else if (message.type === 'HIDE_IDLE_PROMPT') {
     hideIdlePrompt();
     sendResponse({ success: true });
+  } else if (message.type === 'SHOW_INACTIVE_NOTIFICATION') {
+    hideIdlePrompt(); // Hide the prompt first
+    showInactiveNotification(); // Show the inactive notification
+    sendResponse({ success: true });
   }
-  
+
   return true;
 });
 
@@ -194,11 +204,11 @@ function showIdlePrompt() {
   modal.innerHTML = `
     <h2 style="margin: 0 0 16px 0; font-size: 24px; color: #333;">Are you still working?</h2>
     <p style="margin: 0 0 24px 0; font-size: 16px; color: #666;">
-      We haven't detected any activity for 10 minutes.
+      We haven't detected any activity for 3 seconds.
     </p>
     <div id="countdown-timer" style="font-size: 48px; font-weight: bold; color: #0176d3; margin: 24px 0;">0:30</div>
     <p style="margin: 0 0 24px 0; font-size: 14px; color: #999;">
-      You will be marked as idle if you don't respond.
+      You will be marked as inactive if you don't respond.
     </p>
     <div style="display: flex; gap: 12px; justify-content: center;">
       <button id="still-working-btn" style="
@@ -211,16 +221,6 @@ function showIdlePrompt() {
         cursor: pointer;
         font-weight: 600;
       ">Yes, I'm here</button>
-      <button id="done-working-btn" style="
-        background: #f3f3f3;
-        color: #333;
-        border: 1px solid #ddd;
-        padding: 12px 24px;
-        font-size: 16px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: 600;
-      ">No, I'm done</button>
     </div>
   `;
 
@@ -243,7 +243,7 @@ function showIdlePrompt() {
     }
   }, 1000);
   
-  // Add event listeners
+  // Add event listener for "Yes, I'm here" button
   modal.querySelector('#still-working-btn').addEventListener('click', () => {
     clearInterval(countdownInterval);
     chrome.runtime.sendMessage({
@@ -251,17 +251,73 @@ function showIdlePrompt() {
       stillWorking: true
     });
   });
-  
-  modal.querySelector('#done-working-btn').addEventListener('click', () => {
-    clearInterval(countdownInterval);
-    chrome.runtime.sendMessage({
-      type: 'PROMPT_RESPONSE',
-      stillWorking: false
-    });
-  });
-  
+
   // Store interval for cleanup
   overlay.countdownInterval = countdownInterval;
+}
+
+// Show "marked as inactive" notification
+function showInactiveNotification() {
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'salesforce-activity-tracker-notification';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  `;
+
+  // Create modal
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    border-radius: 8px;
+    padding: 32px;
+    max-width: 450px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    text-align: center;
+  `;
+
+  // Create content
+  modal.innerHTML = `
+    <div style="font-size: 48px; margin-bottom: 16px;">⏸️</div>
+    <h2 style="margin: 0 0 16px 0; font-size: 24px; color: #d97706;">You have been marked inactive</h2>
+    <p style="margin: 0 0 24px 0; font-size: 16px; color: #666;">
+      Your idle time is being tracked. Move your mouse or type to resume active status.
+    </p>
+    <button id="dismiss-btn" style="
+      background: #0176d3;
+      color: white;
+      border: none;
+      padding: 12px 32px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    ">OK</button>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Add event listener to dismiss button
+  modal.querySelector('#dismiss-btn').addEventListener('click', () => {
+    overlay.remove();
+  });
+
+  // Auto-dismiss after 5 seconds
+  setTimeout(() => {
+    if (overlay.parentNode) {
+      overlay.remove();
+    }
+  }, 5000);
 }
 
 // Hide idle prompt

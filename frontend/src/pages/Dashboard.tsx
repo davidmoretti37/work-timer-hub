@@ -66,6 +66,19 @@ const Dashboard = () => {
     fetchActiveSession(user.id, employeeId);
   }, [user, employeeId]);
 
+  // Auto-refresh active session every 30 seconds to get updated idle time
+  useEffect(() => {
+    if (!user || !employeeId || !user.id || !activeSession) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetchActiveSession(user.id, employeeId);
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [user, employeeId, activeSession]);
+
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from("profiles")
@@ -691,6 +704,17 @@ const Dashboard = () => {
                       </span>
                       <span className="text-sm text-muted-foreground">
                         {formattedClockIn.date}
+                      </span>
+                    </div>
+                  )}
+                  {activeSession?.idle_seconds > 0 && (
+                    <div className="flex flex-col p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <span className="text-sm text-orange-700 dark:text-orange-300 font-medium">Idle Time</span>
+                      <span className="text-xl font-semibold text-orange-600 dark:text-orange-400">
+                        {formatBreakTime(activeSession.idle_seconds)}
+                      </span>
+                      <span className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                        Time inactive while clocked in
                       </span>
                     </div>
                   )}

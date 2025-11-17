@@ -9,7 +9,9 @@
   ],
   "host_permissions": [
     "*://*.salesforce.com/*",
+    "*://*.salesforce-setup.com/*",
     "*://*.force.com/*",
+    "*://*.my.salesforce.com/*",
     "https://work-timer-hub.vercel.app/*"
   ],
   "background": {
@@ -19,7 +21,9 @@
     {
       "matches": [
         "*://*.salesforce.com/*",
-        "*://*.force.com/*"
+        "*://*.salesforce-setup.com/*",
+        "*://*.force.com/*",
+        "*://*.my.salesforce.com/*"
       ],
       "js": ["content.js"],
       "run_at": "document_idle"
@@ -30,7 +34,9 @@
       "resources": ["popup.html", "popup.css"],
       "matches": [
         "*://*.salesforce.com/*",
-        "*://*.force.com/*"
+        "*://*.salesforce-setup.com/*",
+        "*://*.force.com/*",
+        "*://*.my.salesforce.com/*"
       ]
     }
   ],

@@ -3,7 +3,7 @@
 
 const API_ENDPOINT = 'https://work-timer-hub.vercel.app/api/update-activity';
 const HEARTBEAT_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const IDLE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+const IDLE_TIMEOUT = 3 * 1000; // 3 SECONDS FOR TESTING (change back to 10 * 60 * 1000 for production)
 const PROMPT_TIMEOUT = 30 * 1000; // 30 seconds to respond
 
 let activityState = {
@@ -46,6 +46,12 @@ function handleActivity(tabId) {
   const now = Date.now();
   activityState.lastActivity = now;
 
+  // If prompt is showing, ignore activity (user must click the button)
+  if (activityState.promptShown) {
+    console.log('[Background] Ignoring activity - prompt is showing, waiting for user response');
+    return;
+  }
+
   // Reset idle tracking when user becomes active
   activityState.idleStartTime = null;
 
@@ -75,11 +81,6 @@ function handleActivity(tabId) {
   if (!activityState.heartbeatTimerId) {
     startHeartbeat();
   }
-
-  // Hide prompt if it was showing
-  if (activityState.promptShown) {
-    hidePrompt(tabId);
-  }
 }
 
 // Handle idle timeout (10 minutes of inactivity)
@@ -107,20 +108,31 @@ function handleIdleTimeout(tabId) {
 function handlePromptTimeout(tabId) {
   console.log('[Background] Prompt timeout - marking as idle');
   markAsIdle(tabId);
+
+  // Show inactive notification to user
+  chrome.tabs.sendMessage(tabId, {
+    type: 'SHOW_INACTIVE_NOTIFICATION'
+  }).catch(err => {
+    console.log('[Background] Could not show inactive notification:', err);
+  });
 }
 
 // Handle user response to prompt
 function handlePromptResponse(stillWorking, tabId) {
   console.log('[Background] User response:', stillWorking ? 'Still working' : 'Done working');
-  
+
   // Clear prompt timer
   if (activityState.promptTimerId) {
     clearTimeout(activityState.promptTimerId);
     activityState.promptTimerId = null;
   }
-  
+
+  // Hide the prompt
+  hidePrompt(tabId);
+
+  // Reset prompt flag BEFORE calling handleActivity
   activityState.promptShown = false;
-  
+
   if (stillWorking) {
     // User is still working - reset activity
     handleActivity(tabId);
@@ -128,9 +140,6 @@ function handlePromptResponse(stillWorking, tabId) {
     // User is done - mark as idle
     markAsIdle(tabId);
   }
-  
-  // Hide the prompt
-  hidePrompt(tabId);
 }
 
 // Mark user as idle
